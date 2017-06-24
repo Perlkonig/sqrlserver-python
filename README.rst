@@ -10,6 +10,7 @@ Currently Implemented
 
 * ``nut_generate``: Generates a base64-encoded nut with embedded sanity checking data
 * ``nut_validate``: Analyzes a base64-encoded nut and returns a dictionary of validity checks
+* ``url_generate``: Generates the URL that directs the SQRL client where to authenticate
 
 Todo
 ----

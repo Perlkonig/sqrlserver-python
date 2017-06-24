@@ -3,6 +3,7 @@ import hashlib
 import time
 import struct
 import numpy.random
+import urllib.parse
 from base64 import b64encode, b64decode
 from bitstring import BitArray
 
@@ -10,7 +11,7 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.backends import default_backend
 
 def nut_generate(key, nonce, ipaddr, counter, timestamp=None):
-	"""Generates a unique nut
+	"""Generates a unique nut using the technique described in the spec (LINK)
 
 	Parameters
 	----------
@@ -75,7 +76,7 @@ def nut_generate(key, nonce, ipaddr, counter, timestamp=None):
 	#process and return
 	return (b64encode(ctqr)[:-2].decode('utf-8'), b64encode(ctlink)[:-2].decode('utf-8'))
 
-def nut_validate(response, key, nonce, ipaddr, ttl, maxcounter, mincounter=0):
+def nut_validate(response, key, nonce, ipaddr, ttl, maxcounter=None, mincounter=0):
 	"""Decodes and validates the returned nut
 
 	Parameters
@@ -91,7 +92,7 @@ def nut_validate(response, key, nonce, ipaddr, ttl, maxcounter, mincounter=0):
 	ttl : long
 		Number of seconds old the nut is allowed to be
 	maxcounter : long
-		Current counter.
+		Current counter. If None, then no upper-bound checking will occur.
 	mincounter : long
 		Smallest counter value you're willing to accept.
 
@@ -140,7 +141,7 @@ def nut_validate(response, key, nonce, ipaddr, ttl, maxcounter, mincounter=0):
 
 	#verify counter
 	counter = struct.unpack('L', banut[64:96].bytes)[0]
-	if ( (counter >= mincounter) and (counter <= maxcounter) ):
+	if ( (counter >= mincounter) and ( (maxcounter is None) or (counter <= maxcounter) ) ):
 		ret['counter'] = True
 	else:
 		ret['counter'] = False
@@ -153,3 +154,71 @@ def nut_validate(response, key, nonce, ipaddr, ttl, maxcounter, mincounter=0):
 		ret['link'] = True
 
 	return ret
+
+def url_generate(authority, path, nut, sfn, query=[], ext=0, secure=True):
+	"""Produces a valid SQRL link (LINK TO SPEC)
+
+	Parameters
+	----------
+	authority : string
+		The authority part of the url the SQRL client will contact to authenticate.
+		Includes the username, password, domain, and port.
+		See RFC 3986, Jan 2005, section 3.2 (https://tools.ietf.org/html/rfc3986#section-3.2)
+	path : string
+		The path the SQRL client will contact to authenticate.
+	nut : string
+		Base64-encoded URL-safe string that is 
+		  - opaque,
+		  - reasonably unique, and
+		  - cryptographically unpredictable.
+	sfn : string
+		The "server friendly name" the SQRL client will use to identify you to the user.
+	query : array of tuples
+		Each tuple represents additional name-value pairs the SQRL client will need to 
+		return when it tries to authenticate.
+	ext : int
+		If greater than zero, it signals to the SQRL client how much of the path should
+		be considered as part of the site's official identifier (LINK TO SPEC).
+		Defaults to 0.
+	secure : boolean
+		If True, uses the ``sqrl`` scheme, otherwise it uses ``qrl``.
+		Defaults to True.
+
+	Returns
+	-------
+	string representing a valid SQRL URL
+		Query parameters will always appear in the following order:
+		  - nut
+		  - sfn
+		  - x (if present)
+		  - user-provided parameters in the order provided
+	"""
+	parts = []
+	#scheme
+	if secure:
+		parts.append('sqrl')
+	else:
+		parts.append('qrl')
+
+	#authority
+	parts.append(authority)
+
+	#path
+	parts.append(path)
+
+	#params
+	parts.append(None)
+
+	#query (insert at front in reverse order)
+	if query is None:
+		query = []
+	if ( (ext is not None) and (ext > 0) ):
+		query.insert(0, ('x', ext))
+	query.insert(0, ('sfn', b64encode(sfn.encode('utf-8'))))
+	query.insert(0, ('nut', nut))
+	parts.append(urllib.parse.urlencode(query, True))
+
+	#fragment
+	parts.append(None)
+
+	return urllib.parse.urlunparse(parts)

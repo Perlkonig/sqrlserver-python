@@ -5,6 +5,7 @@
 import sqrlserver
 import numpy.random
 import time
+import urllib.parse
 
 nuts = {}
 key = numpy.random.bytes(16)
@@ -96,3 +97,41 @@ def test_nutval():
 	nut = sqrlserver.nut_generate(key, nonce, '155.6.0.126', counter + 100)[0]
 	val = sqrlserver.nut_validate(nut, key, nonce, '155.6.0.126', 600, counter)
 	assert not val['counter']
+
+	#counter validation can be turned off
+	#	Use previously generated nut with a counter value too high
+	#	but omit the maxcounter from the validation call.
+	val = sqrlserver.nut_validate(nut, key, nonce, '155.6.0.126', 600)
+	assert val['counter']
+
+def test_urlgen():
+	nut = sqrlserver.nut_generate(key, nonce, '155.6.0.126', counter)[0]
+	
+	#bare minimum
+	u = sqrlserver.url_generate('example.com', '/auth/sqrl', nut, 'Example Site')
+	assert u == 'sqrl://example.com/auth/sqrl?nut=' + urllib.parse.quote(nut, safe='') + '&sfn=RXhhbXBsZSBTaXRl'
+
+	#bare minimum unsecured
+	u = sqrlserver.url_generate('example.com', '/auth/sqrl', nut, 'Example Site', None, None, False)
+	assert u == 'qrl://example.com/auth/sqrl?nut=' + urllib.parse.quote(nut, safe='') + '&sfn=RXhhbXBsZSBTaXRl'
+
+	#with additional parameters
+	u = sqrlserver.url_generate('example.com', '/auth/sqrl', nut, 'Example Site', [('name1', 'value1'), ('name2', 'value2')])
+	assert u == 'sqrl://example.com/auth/sqrl?nut=' + urllib.parse.quote(nut, safe='') + '&sfn=RXhhbXBsZSBTaXRl&name1=value1&name2=value2'
+
+	#with authority parts
+	u = sqrlserver.url_generate('user:pass@example.com:8081', '/auth/sqrl', nut, 'Example Site', [('name1', 'value1'), ('name2', 'value2')])
+	assert u == 'sqrl://user:pass@example.com:8081/auth/sqrl?nut=' + urllib.parse.quote(nut, safe='') + '&sfn=RXhhbXBsZSBTaXRl&name1=value1&name2=value2'
+
+	#SFN with weird characters
+	u = sqrlserver.url_generate('user:pass@example.com:8081', '/auth/sqrl', nut, 'Exàmple Site', [('name1', 'value1'), ('name2', 'value2')])
+	assert u == 'sqrl://user:pass@example.com:8081/auth/sqrl?nut=' + urllib.parse.quote(nut, safe='') + '&sfn=RXjDoG1wbGUgU2l0ZQ%3D%3D&name1=value1&name2=value2'
+
+	#with extension and params
+	u = sqrlserver.url_generate('user:pass@example.com:8081', '/auth/sqrl', nut, 'Exàmple Site', [('name1', 'value1'), ('name2', 'value2')], 5)
+	assert u == 'sqrl://user:pass@example.com:8081/auth/sqrl?nut=' + urllib.parse.quote(nut, safe='') + '&sfn=RXjDoG1wbGUgU2l0ZQ%3D%3D&x=5&name1=value1&name2=value2'
+
+	#with extension but with no other params
+	u = sqrlserver.url_generate('user:pass@example.com:8081', '/auth/sqrl', nut, 'Exàmple Site', None, 5)
+	assert u == 'sqrl://user:pass@example.com:8081/auth/sqrl?nut=' + urllib.parse.quote(nut, safe='') + '&sfn=RXjDoG1wbGUgU2l0ZQ%3D%3D&x=5'
+
