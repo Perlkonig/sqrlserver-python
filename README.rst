@@ -8,11 +8,10 @@ This module supports Python-based web servers in processing SQRL_ requests. It o
 Currently Implemented
 ---------------------
 
-* ``nut_generate``: Generates a base64-encoded nut with embedded sanity checking data
-* ``nut_validate``: Analyzes a base64-encoded nut and returns a dictionary of validity checks
+* ``Nut`` class: Used for generating, inspecting, and validating nuts
 * ``url_generate``: Generates the URL that directs the SQRL client where to authenticate
 
 Todo
 ----
 
-* Lots of signature validation code. Still digesting the spec.
+* Working on the base Request class
