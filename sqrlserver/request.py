@@ -11,11 +11,16 @@ from base64 import urlsafe_b64encode, urlsafe_b64decode
 class Request:
     """Class encompassing SQRL client requests
 
-    Anticipated workflow is as follows:
-        - Construct
-        - While ``action`` is None
-            - Execute ``handle``, passing any arguments needed based on ``action``
-        - Generate and return ``response``
+    The class acts as a simple state machine. The request can have one of five states:
+        - NEW (initial state, no processing has been done)
+        - WELLFORMED (initial well-formedness checks have been done and passed)
+        - VALID (initial validity tests have been done and passed; while in this state, the request will processing client-submitted commands)
+        - ACTION (the user needs to provide additional information)
+        - COMPLETE (end state; finalize and return the response)
+
+    When the class is initialized, it will start the transition loop. It will never exit without the state being either ACTION or COMPLETE.
+        - ACTION means the user needs to gather information. It is accompanied by a payload that explains what it needs.
+        - COMPLETE means that all processing that can be done has been done. You can finalize and return the response, which will include the necessary status codes for the client.
     """
 
     supported_versions = ['1']
@@ -23,9 +28,14 @@ class Request:
     supported_cmds = ['query']
     known_opts = ['sqrlonly', 'hardlock', 'cps', 'suk']
     supported_opts = []
+    actions = ['confirm']
 
     def __init(self, key, params, **kwargs):
         """Constructor
+
+        Errors in the \**kwargs will result in a thrown ValueError.
+        Any other errors that arise not from client input also result in thrown errors.
+        All client-related errors are communicated through the Response object. 
 
         Parameters
         ----------
@@ -91,93 +101,18 @@ class Request:
         
         self._response = Response()
         self.params = params
+        self.key = key
 
-        self.wellformed = True
-        #required params
-        if self.wellformed:
-            for req in ['nut', 'client', 'server', 'idk', 'ids']:
-                if req not in self.params:
-                    self.wellformed = False
-                    break
-
-        self.tosign = self.params['client'] + self.params['server']
-        
-        #valid client
-        if self.wellformed:
-            try:
-                self.params['client'] = Request._extract_client(self.params['client'])
-            except:
-                self.wellformed = False
-            if self.wellformed:
-                for req in ['ver', 'cmd']:
-                    if req not in self.params['client']:
-                        self.wellformed = False
-                        break
-                if self.params['client']['ver'] not in self.supported_versions:
-                    self.wellformed = False
-                if self.params['client']['cmd'] not in self.known_cmds:
-                    self.wellformed = False
-                if 'opt' in self.params['client']:
-                    for opt in self.params['client']['opt']:
-                        if opt not in self.known_opts:
-                            self.wellformed = False
-                            break
-
-        #valid server
-        if self.wellformed:
-            try:
-                self.params['server'] = Request._extract_server(self.params['server'])
-            except:
-                self.wellformed = False
-
+        #set initial state and start transition loop
+        self.state = 'NEW'
         self.action = None
-        #if not well formed, seed the response
-        if not self.wellformed:
-            self._response.tifOn(0x40, 0x80)
-        #otherwise handle it
-        else:
-            # Validate the signatures. If any of them are invalid, reject everything.
-            validsigs = Request._signature_valid(self.tosign, self.params['idk'], self.params['ids'])
-            if ( (validsigs) and ('pidk' in self.params) and ('pids' in self.params) ):
-                validsigs = Request._signature_valid(self.tosign, self.params['pidk'], self.params['pids'])
+        self.handle()
 
-            if validsigs:
-                # Validate nut when request is first built so later 
-                # iterations of ``handle`` don't have to
-                validnut = True
-                self.nut = Nut(key)
-                try:
-                    self.nut = nut.load(self.params['nut']).validate(self.ipaddr, self.ttl)
-                except nacl.exceptions.CryptoError:
-                    validnut = False
-
-                if validnut:
-                    errs = []
-                    if not self.nut.ipmatch:
-                        errs.append('ip')
-                    else:
-                        self._response.tifOn(0x04)
-                    if not self.nut.fresh:
-                        errs.append('time')
-                    if not self.nut.countersane:
-                        errs.append('counter')
-
-                    #If there are errors, set the 'confirm' action and terminate.
-                    if len(errs) > 0:
-                        self.action = ('confirm', errs)
-                    #Otherwise, start the ``handle`` loop
-                    else:
-                        self.handle()
-                else:
-                    self._response.tifOn(0x20, 0x40)
-            else:
-                self._response.tifOn(0x40, 0x80)
-
-    def handle(self, args):
-        """The core request handler. After each call, it will set the ``action``
-        property. The user is expected to keep calling ``handle`` (with appropriate
-        ``args``) until ``action`` is ``None``, at which point the response object
-        can be finalized and returned.
+    def handle(self, args={}):
+        """The core request handler. After each call, it will set the ``state``
+        property to either ``ACTION`` or ``COMPLETE``. The user is expected to keep 
+        calling ``handle`` (with appropriate ``args``) until ``COMPLETE``, at which 
+        point the response object can be finalized and returned.
 
         Parameters
         ----------
@@ -198,14 +133,20 @@ class Request:
         -------
         The goal of this library is to generalize as much as is reasonable. That means
         this code has no idea how your server runs or stores data. So to fulfil the request,
-        it may require additional information. That is gathered by setting the ``action``
-        property. The user should keep running ``handle`` until ``action`` is None, at 
-        which point the ``response`` can be finalized and returned.
+        it may require additional information. That is gathered by setting the ``state`` to
+        ``ACTION`` and by setting the ``action`` property.
 
-        The ``action property``, if set, will be a tuple with at least one element.
-        The first element will be a keyword, described further below. Depending on that
-        keyword, additional elements may be provided. You are expected to call ``handle``
+        The ``action`` property, if set, will be an array of tuples. The actions should
+        be resolved in the order provided. 
+
+        The first element of each tuple will be a keyword, described further below. Depending 
+        on that keyword, additional elements may be provided. You are expected to call ``handle``
         again with any requested information passed in a single dictionary.
+
+        To prevent infinite loops, if the data provided to an action request is insufficient,
+        a default action will be taken if appropriate (e.g., anything other than an explicit
+        affirmitive response to the ``confirm`` action will be treated as rejection) or an 
+        exception will be thrown.
 
         confirm
         ^^^^^^^
@@ -221,29 +162,65 @@ class Request:
             The subsequent call to ``handle`` expects the following dictionary:
                 'confirm' : boolean
                     If True, the handler will process the request.
-                    If False, the handler will set the appropriate error codes terminate.
+                    In all other cases, the handler will set the appropriate error codes and terminate.
         """
-        #Entry point is to start processing commands.
-        #Happens if ``action`` is None or if response to ``confirm`` is True.
-        if ( (self.action is None) or ( (self.action[0] == 'confirm') and ('confirm' in args) and args['confirm'] == True ) ):
-            cmd = self.params['client'].cmd
-            #Is the ``cmd`` supported?
-            if (cmd not in self.supported_cmds):
-                self._response.tifOn(0x10, 0x40)
-                self.action = None
-            else:
-                if cmd == 'query':
-                    pass
-                else:
-                    raise RuntimeError("The supported command '{}' was unhandled! This should never happen! Please file a bug report!".format(cmd))
-        #If ``action`` is confirm and it was not caught above, then it's a failed confirmation.
-        elif self.action[0] == 'confirm':
-            self._response.tifOn(0x20, 0x40)
-            self.action = None
-        #The fallback should never happen. Throw an error.
-        else:
-            raise RuntimeError("The combination of action ({}) and response ({}) was not caught. This should never happen! Please file a bug report!".format(self.action, args))
 
+        #First check if we're in an ``ACTION`` state and process given data
+        #Throw error if insufficient or malformed data is passed.
+        #Otherwise, set appropriate state and continue.
+        if self.state == 'ACTION':
+            for action in self.action:
+                if action[0] == 'confirm':
+                    if ('confirm' in args) and (args['confirm'] == True ):
+                        self.state = 'VALID'
+                    else:
+                        self._response.tifOn(0x20, 0x40)
+                        self.state = 'COMPLETE'
+                else:
+                    raise ValueError('Unrecognized action ({}). This should never happen!'.format(action[0]))
+
+        #Loop until we need additional information or are finished.
+        while self.state not in ['ACTION', 'COMPLETE']:
+            if self.state == 'NEW':
+                #perform basic well-formedness checks and set state accordingly
+                wf = self.check_well_formedness()
+                if wf:
+                    self.state = 'WELLFORMED'
+                else:
+                    self._response.tifOn(0x40, 0x80)
+                    self.state = 'COMPLETE'
+            elif self.state == 'WELLFORMED':
+                #perform validity tests and set state accordingly
+                errs = self.check_validity()
+                #invalid signature
+                if 'sigs' in errs:
+                    self._response.tifOn(0x40, 0x80)
+                    self.state = 'COMPLETE'
+                elif 'nut' in errs:
+                    self._response.tifOn(0x20, 0x40)
+                    self.state = 'COMPLETE'
+                elif len(errs) > 0:
+                    self.state = 'ACTION'
+                    self.action = [('confirm', errs)]
+                else:
+                    self.state = 'VALID'
+            elif self.state == 'VALID':
+                #process the CMD
+                cmd = self.params['client'].cmd
+                #Is the ``cmd`` supported?
+                if (cmd not in self.supported_cmds):
+                    self._response.tifOn(0x10, 0x40)
+                    self.state = 'COMPLETE'
+                else:
+                    if cmd == 'query':
+                        pass
+                    else:
+                        raise RuntimeError("The supported command '{}' was unhandled! This should never happen! Please file a bug report!".format(cmd))
+            else:
+                raise ValueError('The given request state ({}) is unrecognized. This should never happen!'.format(self.state))
+
+        #This code should never exit in a state other than ``ACTION`` or ``COMPLETE``
+        assert self.state in ['ACTION', 'COMPLETE']
 
     def response(self):
         """Finalizes and returns the internal Response object.
@@ -252,6 +229,74 @@ class Request:
         ----------
         """
         pass
+
+    def check_well_formedness(self):
+        #required params
+        for req in ['nut', 'client', 'server', 'idk', 'ids']:
+            if req not in self.params:
+                return False
+
+        self.tosign = self.params['client'] + self.params['server']
+        
+        #valid client
+        try:
+            self.params['client'] = Request._extract_client(self.params['client'])
+        except:
+            return False
+
+        for req in ['ver', 'cmd']:
+            if req not in self.params['client']:
+                return False
+        if self.params['client']['ver'] not in self.supported_versions:
+            return False
+        if self.params['client']['cmd'] not in self.known_cmds:
+            return False
+        if 'opt' in self.params['client']:
+            for opt in self.params['client']['opt']:
+                if opt not in self.known_opts:
+                    return False
+
+        #valid server
+        try:
+            self.params['server'] = Request._extract_server(self.params['server'])
+        except:
+            return False
+
+        return True
+
+    def check_validity(self):
+        errs = []
+
+        # Validate the signatures. If any of them are invalid, reject everything.
+        validsigs = Request._signature_valid(self.tosign, self.params['idk'], self.params['ids'])
+        if ( (validsigs) and ('pidk' in self.params) and ('pids' in self.params) ):
+            validsigs = Request._signature_valid(self.tosign, self.params['pidk'], self.params['pids'])
+        if not validsigs:
+            errs.append('sigs')
+
+        if validsigs:
+            # Validate nut when request is first built so later 
+            # iterations of ``handle`` don't have to
+            validnut = True
+            self.nut = Nut(self.key)
+            try:
+                self.nut = nut.load(self.params['nut']).validate(self.ipaddr, self.ttl)
+            except nacl.exceptions.CryptoError:
+                validnut = False
+            if not validnut:
+                errs.append('nut')
+
+            if validnut:
+                if not self.nut.ipmatch:
+                    errs.append('ip')
+                else:
+                    self._response.tifOn(0x04)
+                if not self.nut.fresh:
+                    errs.append('time')
+                if not self.nut.countersane:
+                    errs.append('counter')
+
+        return errs
 
     @staticmethod
     def _extract_client(s):

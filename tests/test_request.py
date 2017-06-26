@@ -1,4 +1,5 @@
 import sqrlserver
+import pytest
 
 def test_client():
     #test client parsing
@@ -6,6 +7,11 @@ def test_client():
     client = sqrlserver.Request._extract_client(clientstr)
     target = {'idk': 'TLpyrowLhWf9-hdLLPQOA-7-xplI9LOxsfLXsyTccVc', 'ver': '1', 'cmd': 'query', 'opt': ['cps', 'suk']}
     assert client == target
+
+    #bad client string
+    with pytest.raises(ValueError):
+        clientstr = 'dmVyPTENCmNtZD1xdWVyeQ0KaWRrPVRMcHlyb3dMaFdmOS1oZExMUFFPQS03LXhwbEk5TE94c2ZMWHN5VGNjVmMNCm9wdD1jcHN-c3VrDQoa'
+        client = sqrlserver.Request._extract_client(clientstr)
 
 def test_server():
     #test server parsing
@@ -17,6 +23,11 @@ def test_server():
     serverstr = 'dmVyPTENCm51dD1qMjA0c0F5NXBtVXFvamtNOHJ6aUtnDQp0aWY9QzQNCnFyeT0vc3FybD9udXQ9ajIwNHNBeTVwbVVxb2prTThyemlLZw0Kc2luPTANCg'
     server = sqrlserver.Request._extract_server(serverstr)
     assert server == {'ver': '1', 'nut': 'j204sAy5pmUqojkM8rziKg', 'tif': 'C4', 'qry': '/sqrl?nut=j204sAy5pmUqojkM8rziKg', 'sin': '0'}
+
+    #bad server string
+    with pytest.raises(ValueError):
+        serverstr = 'dmVyPTENCm51dD1qMjA0c0F5NXBtVXFvamtNOHJ6aUtnDQp0aWY9QzQNCnFyeT0vc3FybD9udXQ9ajIwNHNBeTVwbVVxb2prTThyemlLZw0Kc2luPTANCga'
+        server = sqrlserver.Request._extract_server(serverstr)
 
 def test_sig_validation():
     #signature validation
