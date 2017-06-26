@@ -67,10 +67,10 @@ class Nut:
         self.timestamp = timestamp
         if self.timestamp is None:
             self.timestamp = time.time()
-        batime = BitArray(struct.pack('L', int(self.timestamp)))
+        batime = BitArray(struct.pack('I', int(self.timestamp)))
 
         self.counter = counter
-        bacounter = BitArray(struct.pack('L', counter))
+        bacounter = BitArray(struct.pack('I', counter))
 
         barand = BitArray(nacl.utils.random(4))
 
@@ -109,10 +109,10 @@ class Nut:
         self.ip = None
 
         #verify timestamp
-        self.timestamp = struct.unpack('L', self.nuts['raw'][32:64].bytes)[0]
+        self.timestamp = struct.unpack('I', self.nuts['raw'][32:64].bytes)[0]
 
         #verify counter
-        self.counter = struct.unpack('L', self.nuts['raw'][64:96].bytes)[0]
+        self.counter = struct.unpack('I', self.nuts['raw'][64:96].bytes)[0]
 
         #set flag
         if self.nuts['raw'][-1] == 0:
