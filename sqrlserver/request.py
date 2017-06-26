@@ -3,6 +3,9 @@ from .response import Response
 from .nut import Nut
 import ipaddress
 import urllib.parse
+import nacl.exceptions
+import nacl.signing
+import nacl.encoding
 from base64 import urlsafe_b64encode, urlsafe_b64decode
 
 class Request:
@@ -32,7 +35,6 @@ class Request:
             All the query parameters from the query string and POST body.
             The following parameters must exist:
                 - nut
-                - nonce
                 - server
                 - client
                 - idk
@@ -93,10 +95,12 @@ class Request:
         self.wellformed = True
         #required params
         if self.wellformed:
-            for req in ['nut', 'nonce', 'client', 'server', 'idk', 'ids']:
+            for req in ['nut', 'client', 'server', 'idk', 'ids']:
                 if req not in self.params:
                     self.wellformed = False
                     break
+
+        self.tosign = self.params['client'] + self.params['server']
         
         #valid client
         if self.wellformed:
@@ -133,28 +137,42 @@ class Request:
         #otherwise handle it
         else:
             # Validate the signatures. If any of them are invalid, reject everything.
-            
-            # Validate nut when request is first built so later 
-            # iterations of ``handle`` don't have to
-            self.nut = Nut(key)
-            self.nut = nut.load(self.params['nonce'], self.params['nut']).validate(self.ipaddr, self.ttl)
-            if self.nut.ipmatch:
-                self._response.tifOn(0x04)
+            validsigs = Request._signature_valid(self.tosign, self.params['idk'], self.params['ids'])
+            if ( (validsigs) and ('pidk' in self.params) and ('pids' in self.params) ):
+                validsigs = Request._signature_valid(self.tosign, self.params['pidk'], self.params['pids'])
 
-            errs = []
-            if not self.nut.ipmatch:
-                errs.append('ip')
-            if not self.nut.fresh:
-                errs.append('time')
-            if not self.nut.countersane:
-                errs.append('counter')
+            if validsigs:
+                # Validate nut when request is first built so later 
+                # iterations of ``handle`` don't have to
+                validnut = True
+                self.nut = Nut(key)
+                try:
+                    self.nut = nut.load(self.params['nut']).validate(self.ipaddr, self.ttl)
+                except nacl.exceptions.CryptoError:
+                    validnut = False
 
-            #If there are errors, set the 'confirm' action and terminate.
-            if len(errs) > 0:
-                self.action = ('confirm', errs)
-            #Otherwise, start the ``handle`` loop
+                if validnut:
+                    if self.nut.ipmatch:
+                        self._response.tifOn(0x04)
+
+                    errs = []
+                    if not self.nut.ipmatch:
+                        errs.append('ip')
+                    if not self.nut.fresh:
+                        errs.append('time')
+                    if not self.nut.countersane:
+                        errs.append('counter')
+
+                    #If there are errors, set the 'confirm' action and terminate.
+                    if len(errs) > 0:
+                        self.action = ('confirm', errs)
+                    #Otherwise, start the ``handle`` loop
+                    else:
+                        self.handle()
+                else:
+                    self._response.tifOn(0x20, 0x40)
             else:
-                self.handle()
+                self._response.tifOn(0x40, 0x80)
 
     def handle(self, args):
         """The core request handler. After each call, it will set the ``action``
@@ -273,6 +291,15 @@ class Request:
             name, value = line.split('=', 1)
             server[name] = value
         return server
+
+    @staticmethod
+    def _signature_valid(msg, key, sig):
+        try:
+            vk = nacl.signing.VerifyKey(pad(key), encoder=nacl.encoding.URLSafeBase64Encoder)
+            vk.verify(msg.encode('utf-8'), urlsafe_b64decode(pad(sig)))
+            return True
+        except nacl.exceptions.BadSignatureError:
+            return False
 
 
 
