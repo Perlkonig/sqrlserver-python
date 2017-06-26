@@ -152,12 +152,11 @@ class Request:
                     validnut = False
 
                 if validnut:
-                    if self.nut.ipmatch:
-                        self._response.tifOn(0x04)
-
                     errs = []
                     if not self.nut.ipmatch:
                         errs.append('ip')
+                    else:
+                        self._response.tifOn(0x04)
                     if not self.nut.fresh:
                         errs.append('time')
                     if not self.nut.countersane:
