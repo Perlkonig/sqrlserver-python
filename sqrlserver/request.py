@@ -18,7 +18,8 @@ class Request:
         - ACTION (the user needs to provide additional information)
         - COMPLETE (end state; finalize and return the response)
 
-    When the class is initialized, it will start the transition loop. It will never exit without the state being either ACTION or COMPLETE.
+    After the class is initialized, call ``handle`` to start the transition loop. 
+    It will never exit without the state being either ACTION or COMPLETE.
         - ACTION means the user needs to gather information. It is accompanied by a payload that explains what it needs.
         - COMPLETE means that all processing that can be done has been done. You can finalize and return the response, which will include the necessary status codes for the client.
     """
@@ -30,7 +31,7 @@ class Request:
     supported_opts = []
     actions = ['confirm']
 
-    def __init(self, key, params, **kwargs):
+    def __init__(self, key, params, **kwargs):
         """Constructor
 
         Errors in the \**kwargs will result in a thrown ValueError.
@@ -100,13 +101,12 @@ class Request:
             self.secure = kwargs['secure']
         
         self._response = Response()
-        self.params = params
+        self.params = dict(params)
         self.key = key
 
-        #set initial state and start transition loop
+        #set initial state 
         self.state = 'NEW'
         self.action = None
-        self.handle()
 
     def handle(self, args={}):
         """The core request handler. After each call, it will set the ``state``
@@ -232,7 +232,7 @@ class Request:
 
     def check_well_formedness(self):
         #required params
-        for req in ['nut', 'client', 'server', 'idk', 'ids']:
+        for req in ['nut', 'client', 'server', 'ids']:
             if req not in self.params:
                 return False
 
@@ -244,7 +244,7 @@ class Request:
         except:
             return False
 
-        for req in ['ver', 'cmd']:
+        for req in ['ver', 'cmd', 'idk']:
             if req not in self.params['client']:
                 return False
         if self.params['client']['ver'] not in self.supported_versions:
@@ -268,32 +268,31 @@ class Request:
         errs = []
 
         # Validate the signatures. If any of them are invalid, reject everything.
-        validsigs = Request._signature_valid(self.tosign, self.params['idk'], self.params['ids'])
-        if ( (validsigs) and ('pidk' in self.params) and ('pids' in self.params) ):
-            validsigs = Request._signature_valid(self.tosign, self.params['pidk'], self.params['pids'])
+        validsigs = Request._signature_valid(self.tosign, self.params['client']['idk'], self.params['ids'])
+        if ( (validsigs) and ('pidk' in self.params['client']) and ('pids' in self.params) ):
+            validsigs = Request._signature_valid(self.tosign, self.params['client']['pidk'], self.params['pids'])
         if not validsigs:
             errs.append('sigs')
 
         if validsigs:
-            # Validate nut when request is first built so later 
-            # iterations of ``handle`` don't have to
+            # Validate nut 
             validnut = True
-            self.nut = Nut(self.key)
+            nut = Nut(self.key)
             try:
-                self.nut = nut.load(self.params['nut']).validate(self.ipaddr, self.ttl)
+                nut = nut.load(self.params['nut']).validate(self.ipaddr, self.ttl, maxcounter=self.maxcounter, mincounter=self.mincounter)
             except nacl.exceptions.CryptoError:
                 validnut = False
             if not validnut:
                 errs.append('nut')
 
             if validnut:
-                if not self.nut.ipmatch:
+                if not nut.ipmatch:
                     errs.append('ip')
                 else:
                     self._response.tifOn(0x04)
-                if not self.nut.fresh:
+                if not nut.fresh:
                     errs.append('time')
-                if not self.nut.countersane:
+                if not nut.countersane:
                     errs.append('counter')
 
         return errs

@@ -171,7 +171,7 @@ class Nut:
             self.fresh = False
 
         #verify counter
-        if ( (self.counter >= mincounter) and ( (maxcounter is None) or (self.counter <= maxcounter) ) ):
+        if ( ( (mincounter is None) or (self.counter >= mincounter) ) and ( (maxcounter is None) or (self.counter <= maxcounter) ) ):
             self.countersane = True
         else:
             self.countersane = False
