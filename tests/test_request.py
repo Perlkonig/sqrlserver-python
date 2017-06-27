@@ -1,6 +1,8 @@
 import sqrlserver
+from sqrlserver.utils import pad, depad
 import pytest
 import nacl.utils
+import nacl.hash
 import time
 
 def test_client():
@@ -182,11 +184,24 @@ def test_validity():
         'server': 'c3FybDovL3d3dy5ncmMuY29tL3Nxcmw_bnV0PVpIUVNuYllXU0REVWo1NzBtc0l1VlEmc2ZuPVIxSkQmY2FuPWFIUjBjSE02THk5M2QzY3VaM0pqTG1OdmJTOXpjWEpzTDJScFlXY3VhSFJ0',
         'ids': 'tCTr1DoEYANtxGE_        kRNHgSsHa87aRG9C0vNqy7h6CaV8tH5TnBJmdW0gbDsja1JsRbSNA4ZeFVUIfOnzdEz8DA'
     }
+    goodmac = depad(nacl.hash.siphash24(goodparams['server'].encode('utf-8'), key=key[:16], encoder=nacl.encoding.URLSafeBase64Encoder).decode('utf-8'))
+    badmac = goodmac + 'a'
 
     #Basic case should pass
     req = sqrlserver.Request(key, goodparams, ipaddr='1.2.3.4', maxcounter=105)
     assert req.check_well_formedness() == True
     assert len(req.check_validity()) == 0
+
+    #Pass with valid hmac
+    req = sqrlserver.Request(key, goodparams, ipaddr='1.2.3.4', maxcounter=105, hmac=goodmac)
+    assert req.check_well_formedness() == True
+    assert len(req.check_validity()) == 0
+
+    #Fail with bad hmac
+    req = sqrlserver.Request(key, goodparams, ipaddr='1.2.3.4', maxcounter=105, hmac=badmac)
+    assert req.check_well_formedness() == True
+    errs = req.check_validity()
+    assert errs == ['hmac']
 
     #bad signature
     badparams = dict(goodparams)
@@ -237,6 +252,31 @@ def test_validity():
     errs = req.check_validity()
     assert errs == ['ip', 'time', 'counter']
 
+def test_action_META():
+    key = nacl.utils.random(32)
+    nut = sqrlserver.Nut(key)
+    nutstr = nut.generate('1.2.3.4', 100, timestamp=time.time()-100).toString('qr')
+    params = {
+        'nut': nutstr,
+        'sfn': 'R1JD',
+        'can': 'aHR0cHM6Ly93d3cuZ3JjLmNvbS9zcXJsL2RpYWcuaHRt',
+        'client': 'dmVyPTENCmNtZD1xdWVyeQ0KaWRrPVRMcHlyb3dMaFdmOS1oZExMUFFPQS03LXhwbEk5TE94c2ZMWHN5VGNjVmMNCm9wdD1jcHN-c3VrDQo',
+        'server': 'c3FybDovL3d3dy5ncmMuY29tL3Nxcmw_bnV0PVpIUVNuYllXU0REVWo1NzBtc0l1VlEmc2ZuPVIxSkQmY2FuPWFIUjBjSE02THk5M2QzY3VaM0pqTG1OdmJTOXpjWEpzTDJScFlXY3VhSFJ0',
+        'ids': 'tCTr1DoEYANtxGE_        kRNHgSsHa87aRG9C0vNqy7h6CaV8tH5TnBJmdW0gbDsja1JsRbSNA4ZeFVUIfOnzdEz8DA'
+    }
+
+    #Make sure an invalid action blows things up
+    #First create a valid request
+    req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
+    req.handle()
+    assert req.state == 'ACTION'
+    assert req.action == [('find', ['TLpyrowLhWf9-hdLLPQOA-7-xplI9LOxsfLXsyTccVc'])]
+
+    #then mess with the action
+    req.action = [('_find', ['TLpyrowLhWf9-hdLLPQOA-7-xplI9LOxsfLXsyTccVc'])]
+    with pytest.raises(ValueError):
+        req.handle()
+
 def test_action_confirm():
     #should trigger if the nut has issues but everything else is valid
     key = nacl.utils.random(32)
@@ -260,6 +300,14 @@ def test_action_confirm():
 
     #Confirm with False
     req.handle({'confirm': False})
+    assert req.state == 'COMPLETE'
+    assert req._response._tif & 0x20
+    assert req._response._tif & 0x40
+
+    #Confirm with nothing (should also fail)
+    req = sqrlserver.Request(key, params, ipaddr='2.3.4.5')
+    req.handle()
+    req.handle()
     assert req.state == 'COMPLETE'
     assert req._response._tif & 0x20
     assert req._response._tif & 0x40
@@ -289,9 +337,36 @@ def test_cmd_query():
         'ids': 'tCTr1DoEYANtxGE_        kRNHgSsHa87aRG9C0vNqy7h6CaV8tH5TnBJmdW0gbDsja1JsRbSNA4ZeFVUIfOnzdEz8DA'
     }
 
+    #TODO: Need coverage for previous identities
+
     #Create a valid request
     req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
     req.handle()
     assert req.state == 'ACTION'
     assert req.action == [('find', ['TLpyrowLhWf9-hdLLPQOA-7-xplI9LOxsfLXsyTccVc'])]
+
+    #confirm with found
+    req.handle({'found': [True]})
+    assert req.state == 'COMPLETE'
+    assert req._response._tif == 0x01 + 0x04
+
+    #confirm with found but disabled
+    req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
+    req.handle()
+    req.handle({'found': [True], 'disabled': None})
+    assert req.state == 'COMPLETE'
+    assert req._response._tif == 0x01 + 0x04 + 0x08
+
+    #confirm with not found
+    req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
+    req.handle()
+    req.handle({'found': [False]})
+    assert req.state == 'COMPLETE'
+    assert req._response._tif == 0x04
+
+    #confirm with garbage
+    req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
+    req.handle()
+    with pytest.raises(ValueError):
+        req.handle({'found': None})
 

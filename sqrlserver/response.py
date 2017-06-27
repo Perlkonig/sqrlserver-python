@@ -1,4 +1,4 @@
-from bitstring import BitArray
+import nacl.hash
 
 class Response:
     """Class encompassing a response to a SQRL request"""
@@ -21,6 +21,15 @@ class Response:
     def tif(self):
         """Converts the _tif property into the printable format required by the spec."""
         return hex(self._tif)[2:]
+
+    def finalize(self, nut, qry, **kwargs):
+        pass
+
+    def hmac(self, key):
+        pass
+
+    def toString(self):
+        pass
 
     def tifOn(self, *args):
         """Turns on given status bits, if not already on.

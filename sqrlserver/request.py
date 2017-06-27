@@ -6,6 +6,7 @@ import urllib.parse
 import nacl.exceptions
 import nacl.signing
 import nacl.encoding
+import nacl.hash
 from base64 import urlsafe_b64encode, urlsafe_b64decode
 
 class Request:
@@ -26,7 +27,7 @@ class Request:
 
     supported_versions = ['1']
     known_cmds = ['query', 'ident', 'disable', 'enable', 'remove']  
-    supported_cmds = ['query']
+    supported_cmds = ['query', 'ident']
     known_opts = ['sqrlonly', 'hardlock', 'cps', 'suk']
     supported_opts = []
     actions = ['confirm']
@@ -70,6 +71,13 @@ class Request:
             Defaults to None, which disables lower-limit checking of the counter.
         secure : boolean
             Whether the request was received via SSL. Defaults to True.
+        hmac : string
+            The response object emits a keyed MAC. Because this library is stateless, the server
+            has to be responsible for storing this MAC if desired (recommended). It would need to be
+            stored and returned with each repeated query in the same client session. If present,
+            the validity check will verify that the MAC is valid. It is keyed by the master key
+            passed at object instantiation. Unless that key is relatively stable, this check may 
+            not be useful.
         """
         self.ipaddr = ipaddress.ip_address('0.0.0.0')
         if 'ipaddr' in kwargs:
@@ -99,6 +107,10 @@ class Request:
         self.secure = True
         if 'secure' in kwargs:
             self.secure = kwargs['secure']
+
+        self.hmac = None
+        if 'hmac' in kwargs:
+            self.hmac = kwargs['hmac']
         
         self._response = Response()
         self.params = dict(params)
@@ -176,10 +188,25 @@ class Request:
                 to enforce that at this level. The server should simply check all keys.
 
             The subsequent call to ``handle`` expects the following dictionary:
-                'found' : array of booleans
+                'found' : (required) array of booleans
                     True indicates that the key is recognized.
                     False indicates that the key is not recognized.
                     The order should be the same as provided in the ``action`` property.
+                'disabled' : (optional) ANY
+                    The presence of this key (regardless of value) means the primary identity 
+                    is recognized but that the user disabled it. It cannot be used for 
+                    authentication until reenabled or rekeyed.
+        auth
+        ^^^^
+            Asks the server to officially authenticate the given user. 
+
+            Contains the following additional element:
+                - String representing the SQRL identity.
+
+            The subsequent call to ``handle`` expects the following dictionary:
+                'auth' : (required) boolean
+                    If True, the handler will complete the request.
+                    In all other cases, the handler will assume the
         """
 
         #First check if we're in an ``ACTION`` state and process given data
@@ -194,9 +221,20 @@ class Request:
                         self._response.tifOn(0x20, 0x40)
                         self.state = 'COMPLETE'
                 elif action[0] == 'find':
-                    pass
+                    if ( ('found' in args) and (isinstance(args['found'], list)) and (len(args['found']) > 0) ):
+                        if args['found'][0] == True:
+                            self._response.tifOn(0x01)
+                            if 'disabled' in args:
+                                self._response.tifOn(0x08)
+                        if (len(args['found']) > 1):
+                            if args['found'][1] == True:
+                                self._response.tifOn(0x02)
+                        self.state = 'COMPLETE'
+                    else:
+                        raise ValueError("The server failed to respond adequately to the 'find' action. The handler expects a key 'found' and a value that is an array of one or more booleans.")
                 else:
                     raise ValueError('Unrecognized action ({}). This should never happen!'.format(action[0]))
+            self.action = None
 
         #Loop until we need additional information or are finished.
         #TODO: Need to prove there's no chance of an infinite loop, or rewrite.
@@ -214,6 +252,9 @@ class Request:
                 errs = self.check_validity()
                 #invalid signature
                 if 'sigs' in errs:
+                    self._response.tifOn(0x40, 0x80)
+                    self.state = 'COMPLETE'
+                elif 'hmac' in errs:
                     self._response.tifOn(0x40, 0x80)
                     self.state = 'COMPLETE'
                 elif 'nut' in errs:
@@ -238,6 +279,8 @@ class Request:
                         if 'pidk' in self.params['client']:
                             keys.append(self.params['client']['pidk'])
                         self.action = [('find', keys)]
+                    elif cmd == 'ident':
+                        pass
                     else:
                         raise RuntimeError("The supported command '{}' was unhandled! This should never happen! Please file a bug report!".format(cmd))
             else:
@@ -260,7 +303,8 @@ class Request:
             if req not in self.params:
                 return False
 
-        self.tosign = self.params['client'] + self.params['server']
+        self._origserver = self.params['server']
+        self._tosign = self.params['client'] + self.params['server']
         
         #valid client
         try:
@@ -292,32 +336,41 @@ class Request:
         errs = []
 
         # Validate the signatures. If any of them are invalid, reject everything.
-        validsigs = Request._signature_valid(self.tosign, self.params['client']['idk'], self.params['ids'])
+        validsigs = Request._signature_valid(self._tosign, self.params['client']['idk'], self.params['ids'])
         if ( (validsigs) and ('pidk' in self.params['client']) and ('pids' in self.params) ):
-            validsigs = Request._signature_valid(self.tosign, self.params['client']['pidk'], self.params['pids'])
+            validsigs = Request._signature_valid(self._tosign, self.params['client']['pidk'], self.params['pids'])
         if not validsigs:
             errs.append('sigs')
 
         if validsigs:
-            # Validate nut 
-            validnut = True
-            nut = Nut(self.key)
-            try:
-                nut = nut.load(self.params['nut']).validate(self.ipaddr, self.ttl, maxcounter=self.maxcounter, mincounter=self.mincounter)
-            except nacl.exceptions.CryptoError:
-                validnut = False
-            if not validnut:
-                errs.append('nut')
+            #validate hmac if present
+            validmac = True
+            if self.hmac is not None:
+                mac = depad(nacl.hash.siphash24(self._origserver.encode('utf-8'), key=self.key[:16], encoder=nacl.encoding.URLSafeBase64Encoder).decode('utf-8'))
+                if self.hmac != mac:
+                    validmac = False
+                    errs.append('hmac')
 
-            if validnut:
-                if not nut.ipmatch:
-                    errs.append('ip')
-                else:
-                    self._response.tifOn(0x04)
-                if not nut.fresh:
-                    errs.append('time')
-                if not nut.countersane:
-                    errs.append('counter')
+            if validmac:
+                # Validate nut 
+                validnut = True
+                nut = Nut(self.key)
+                try:
+                    nut = nut.load(self.params['nut']).validate(self.ipaddr, self.ttl, maxcounter=self.maxcounter, mincounter=self.mincounter)
+                except nacl.exceptions.CryptoError:
+                    validnut = False
+                if not validnut:
+                    errs.append('nut')
+
+                if validnut:
+                    if not nut.ipmatch:
+                        errs.append('ip')
+                    else:
+                        self._response.tifOn(0x04)
+                    if not nut.fresh:
+                        errs.append('time')
+                    if not nut.countersane:
+                        errs.append('counter')
 
         return errs
 
