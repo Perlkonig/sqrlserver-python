@@ -150,7 +150,7 @@ class Request:
 
         confirm
         ^^^^^^^
-            Means there is an issue with the nut. The user must confirm whether they wish
+            Means there is an issue with the nut. The server must confirm whether they wish
             to proceed.
 
             Contains the following additional element:
@@ -163,6 +163,23 @@ class Request:
                 'confirm' : boolean
                     If True, the handler will process the request.
                     In all other cases, the handler will set the appropriate error codes and terminate.
+        find
+        ^^^^
+            Asks the server to locate the given keys in their user database.
+
+            Contains the following additional element:
+                - Array of strings representing SQRL identities. This array will always
+                at least contain the primary identity. If a previous identities were given
+                by the client, they will also appear in the list. The spec currently
+                limits the number of previous identities to one at a time (meaning this
+                array should never be longer than two elements), but there's no reason
+                to enforce that at this level. The server should simply check all keys.
+
+            The subsequent call to ``handle`` expects the following dictionary:
+                'found' : array of booleans
+                    True indicates that the key is recognized.
+                    False indicates that the key is not recognized.
+                    The order should be the same as provided in the ``action`` property.
         """
 
         #First check if we're in an ``ACTION`` state and process given data
@@ -176,10 +193,13 @@ class Request:
                     else:
                         self._response.tifOn(0x20, 0x40)
                         self.state = 'COMPLETE'
+                elif action[0] == 'find':
+                    pass
                 else:
                     raise ValueError('Unrecognized action ({}). This should never happen!'.format(action[0]))
 
         #Loop until we need additional information or are finished.
+        #TODO: Need to prove there's no chance of an infinite loop, or rewrite.
         while self.state not in ['ACTION', 'COMPLETE']:
             if self.state == 'NEW':
                 #perform basic well-formedness checks and set state accordingly
@@ -206,14 +226,18 @@ class Request:
                     self.state = 'VALID'
             elif self.state == 'VALID':
                 #process the CMD
-                cmd = self.params['client'].cmd
+                cmd = self.params['client']['cmd']
                 #Is the ``cmd`` supported?
                 if (cmd not in self.supported_cmds):
                     self._response.tifOn(0x10, 0x40)
                     self.state = 'COMPLETE'
                 else:
                     if cmd == 'query':
-                        pass
+                        self.state = 'ACTION'
+                        keys = [self.params['client']['idk']]
+                        if 'pidk' in self.params['client']:
+                            keys.append(self.params['client']['pidk'])
+                        self.action = [('find', keys)]
                     else:
                         raise RuntimeError("The supported command '{}' was unhandled! This should never happen! Please file a bug report!".format(cmd))
             else:

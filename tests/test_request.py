@@ -196,6 +196,9 @@ def test_validity():
     errs = req.check_validity()
     assert errs == ['sigs']
 
+    # GAP IN COVERAGE!
+    # TODO: NEED TO ADD TESTS FOR pidk AND pids!
+
     #unreadable nut
     badparams = dict(goodparams)
     badnut = sqrlserver.Nut(nacl.utils.random(32))
@@ -234,10 +237,61 @@ def test_validity():
     errs = req.check_validity()
     assert errs == ['ip', 'time', 'counter']
 
-def test_action_confirm_trigger():
-    pass
+def test_action_confirm():
+    #should trigger if the nut has issues but everything else is valid
+    key = nacl.utils.random(32)
+    nut = sqrlserver.Nut(key)
+    nutstr = nut.generate('1.2.3.4', 100, timestamp=time.time()-100).toString('qr')
+    params = {
+        'nut': nutstr,
+        'sfn': 'R1JD',
+        'can': 'aHR0cHM6Ly93d3cuZ3JjLmNvbS9zcXJsL2RpYWcuaHRt',
+        'client': 'dmVyPTENCmNtZD1xdWVyeQ0KaWRrPVRMcHlyb3dMaFdmOS1oZExMUFFPQS03LXhwbEk5TE94c2ZMWHN5VGNjVmMNCm9wdD1jcHN-c3VrDQo',
+        'server': 'c3FybDovL3d3dy5ncmMuY29tL3Nxcmw_bnV0PVpIUVNuYllXU0REVWo1NzBtc0l1VlEmc2ZuPVIxSkQmY2FuPWFIUjBjSE02THk5M2QzY3VaM0pqTG1OdmJTOXpjWEpzTDJScFlXY3VhSFJ0',
+        'ids': 'tCTr1DoEYANtxGE_        kRNHgSsHa87aRG9C0vNqy7h6CaV8tH5TnBJmdW0gbDsja1JsRbSNA4ZeFVUIfOnzdEz8DA'
+    }
 
-def test_action_confirm_resolve():
-    pass
+    #Create request with ip mismatch and run the handler
+    req = sqrlserver.Request(key, params, ipaddr='2.3.4.5')
+    req.handle()
+    assert req.state == 'ACTION'
+    assert req.action == [('confirm', ['ip'])]
+    assert not req._response._tif & 0x04
 
+    #Confirm with False
+    req.handle({'confirm': False})
+    assert req.state == 'COMPLETE'
+    assert req._response._tif & 0x20
+    assert req._response._tif & 0x40
+
+    #Create request with ttl mismatch and run the handler
+    req = sqrlserver.Request(key, params, ipaddr='1.2.3.4', ttl=0)
+    req.handle()
+    assert req.state == 'ACTION'
+    assert req.action == [('confirm', ['time'])]
+    assert req._response._tif & 0x04
+
+    #Confirm with True
+    req.handle({'confirm': True})
+    assert req.state == 'ACTION'
+    assert req.action == [('find', ['TLpyrowLhWf9-hdLLPQOA-7-xplI9LOxsfLXsyTccVc'])]
+
+def test_cmd_query():
+    key = nacl.utils.random(32)
+    nut = sqrlserver.Nut(key)
+    nutstr = nut.generate('1.2.3.4', 100, timestamp=time.time()-100).toString('qr')
+    params = {
+        'nut': nutstr,
+        'sfn': 'R1JD',
+        'can': 'aHR0cHM6Ly93d3cuZ3JjLmNvbS9zcXJsL2RpYWcuaHRt',
+        'client': 'dmVyPTENCmNtZD1xdWVyeQ0KaWRrPVRMcHlyb3dMaFdmOS1oZExMUFFPQS03LXhwbEk5TE94c2ZMWHN5VGNjVmMNCm9wdD1jcHN-c3VrDQo',
+        'server': 'c3FybDovL3d3dy5ncmMuY29tL3Nxcmw_bnV0PVpIUVNuYllXU0REVWo1NzBtc0l1VlEmc2ZuPVIxSkQmY2FuPWFIUjBjSE02THk5M2QzY3VaM0pqTG1OdmJTOXpjWEpzTDJScFlXY3VhSFJ0',
+        'ids': 'tCTr1DoEYANtxGE_        kRNHgSsHa87aRG9C0vNqy7h6CaV8tH5TnBJmdW0gbDsja1JsRbSNA4ZeFVUIfOnzdEz8DA'
+    }
+
+    #Create a valid request
+    req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
+    req.handle()
+    assert req.state == 'ACTION'
+    assert req.action == [('find', ['TLpyrowLhWf9-hdLLPQOA-7-xplI9LOxsfLXsyTccVc'])]
 
