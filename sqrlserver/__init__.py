@@ -6,6 +6,8 @@ from .utils import pad, depad
 import urllib.parse
 from base64 import urlsafe_b64encode, urlsafe_b64decode
 
+__version__ = '0.1.0'
+
 def url_generate(authority, path, nut, sfn, query=[], ext=0, secure=True):
     """Produces a valid SQRL link (LINK TO SPEC)
 
