@@ -29,7 +29,7 @@ class Request:
     known_cmds = ['query', 'ident', 'disable', 'enable', 'remove']  
     supported_cmds = ['query', 'ident']
     known_opts = ['sqrlonly', 'hardlock', 'cps', 'suk']
-    supported_opts = []
+    supported_opts = ['sqrlonly', 'hardlock', 'cps', 'suk']
     actions = ['confirm']
 
     def __init__(self, key, params, **kwargs):
@@ -118,7 +118,7 @@ class Request:
 
         #set initial state 
         self.state = 'NEW'
-        self.action = None
+        self.action = []
 
     def handle(self, args={}):
         """The core request handler. After each call, it will set the ``state``
@@ -172,9 +172,10 @@ class Request:
                     - counter: the counter did not pass requested sanity checks
 
             The subsequent call to ``handle`` expects the following dictionary:
-                'confirm' : boolean
-                    If True, the handler will process the request.
-                    In all other cases, the handler will set the appropriate error codes and terminate.
+                'confirmed' : boolean
+                    If present and True, the handler will process the request.
+                    In all other cases, the handler will set the appropriate error 
+                    codes and terminate.
         find
         ^^^^
             Asks the server to locate the given keys in their user database.
@@ -200,13 +201,24 @@ class Request:
         ^^^^
             Asks the server to officially authenticate the given user. 
 
-            Contains the following additional element:
-                - String representing the SQRL identity.
+            Contains the following additional elements:
+                - String (required) representing the SQRL identity
+                - String constant ``cps`` (optional) requesting that the auth be handled
+                  as a  "Client Provided Session"
 
             The subsequent call to ``handle`` expects the following dictionary:
-                'auth' : (required) boolean
-                    If True, the handler will complete the request.
-                    In all other cases, the handler will assume the
+                'identified' : (required) boolean
+                    If present and True, the handler will signal success to the client.
+                    In all other cases, the handler will signal an error of some kind.
+                'disabled' : (optional) ANY
+                    The presence of this key (regardless of value) means the primary identity 
+                    is recognized but that the user disabled it. It cannot be used for 
+                    authentication until reenabled or rekeyed.
+
+        sqrlonly
+        ^^^^^^^^
+            Tells the server that this option was set when completing a non-query session.
+            It is up to the server to actually
         """
 
         #First check if we're in an ``ACTION`` state and process given data
@@ -215,7 +227,7 @@ class Request:
         if self.state == 'ACTION':
             for action in self.action:
                 if action[0] == 'confirm':
-                    if ('confirm' in args) and (args['confirm'] == True ):
+                    if ('confirmed' in args) and (args['confirmed'] == True ):
                         self.state = 'VALID'
                     else:
                         self._response.tifOn(0x20, 0x40)
@@ -234,7 +246,7 @@ class Request:
                         raise ValueError("The server failed to respond adequately to the 'find' action. The handler expects a key 'found' and a value that is an array of one or more booleans.")
                 else:
                     raise ValueError('Unrecognized action ({}). This should never happen!'.format(action[0]))
-            self.action = None
+            self.action = []
 
         #Loop until we need additional information or are finished.
         #TODO: Need to prove there's no chance of an infinite loop, or rewrite.
@@ -262,7 +274,7 @@ class Request:
                     self.state = 'COMPLETE'
                 elif len(errs) > 0:
                     self.state = 'ACTION'
-                    self.action = [('confirm', errs)]
+                    self.action.append(('confirm', errs))
                 else:
                     self.state = 'VALID'
             elif self.state == 'VALID':
@@ -278,9 +290,12 @@ class Request:
                         keys = [self.params['client']['idk']]
                         if 'pidk' in self.params['client']:
                             keys.append(self.params['client']['pidk'])
-                        self.action = [('find', keys)]
+                        self.action.append(('find', keys))
                     elif cmd == 'ident':
-                        pass
+                        if 'cps' in self.params['client']['opt']:
+                            self.action.append(('auth', self.params['client']['idk'], 'cps'))
+                        else:
+                            self.action.append(('auth', self.params['client']['idk']))
                     else:
                         raise RuntimeError("The supported command '{}' was unhandled! This should never happen! Please file a bug report!".format(cmd))
             else:
@@ -288,6 +303,26 @@ class Request:
 
         #This code should never exit in a state other than ``ACTION`` or ``COMPLETE``
         assert self.state in ['ACTION', 'COMPLETE']
+
+    def _process_opts(self):
+        """Private method for extracting options and appending appropriate actions
+        to the queue. It will fail unless the Request is currently in the 'VALID' state.
+        It should only be called at the end of a non-query CMD session.
+        """
+        assert self.state == 'VALID'
+        opts = self.params['client']['opt']
+        if 'sqrlonly' in opts:
+            self.action.append(('sqrlonly', True))
+        else:
+            self.action.append(('sqrlonly', False))
+        
+        if 'hardlock' in opts:
+            self.action.append(('hardlock', True))
+        else:
+            self.action.append(('hardlock', False))
+
+        if 'suk' in opts:
+            self.action.append(('suk',))
 
     def response(self):
         """Finalizes and returns the internal Response object.

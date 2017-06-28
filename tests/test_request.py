@@ -299,7 +299,7 @@ def test_action_confirm():
     assert not req._response._tif & 0x04
 
     #Confirm with False
-    req.handle({'confirm': False})
+    req.handle({'confirmed': False})
     assert req.state == 'COMPLETE'
     assert req._response._tif & 0x20
     assert req._response._tif & 0x40
@@ -320,7 +320,7 @@ def test_action_confirm():
     assert req._response._tif & 0x04
 
     #Confirm with True
-    req.handle({'confirm': True})
+    req.handle({'confirmed': True})
     assert req.state == 'ACTION'
     assert req.action == [('find', ['TLpyrowLhWf9-hdLLPQOA-7-xplI9LOxsfLXsyTccVc'])]
 
