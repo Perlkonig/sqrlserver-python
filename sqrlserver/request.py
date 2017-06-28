@@ -217,8 +217,44 @@ class Request:
 
         sqrlonly
         ^^^^^^^^
-            Tells the server that this option was set when completing a non-query session.
-            It is up to the server to actually
+            Tells the server whether to enable or disable 'sqrlonly' on the server side.
+            The spec is unclear about what should happen if the server doesn't want or is
+            unable to honour the request. Here's how the code handles it for now.
+
+            Contains the following additional element:
+                - Boolean (required) signalling whether the option should be turned on or off.
+
+            The subsequent call to ``handle`` expects the following dictionary:
+                'sqrlonly': (optional) boolean
+                    If present and False, the handler will hard fail. It will set codes 0x10 and 0x40
+                    and abort.
+                    In all other cases, the code will simply assume the server has complied.
+
+        hardlock
+        ^^^^^^^^
+            Tells the server whether to enable or disable 'hardlock' on the server side.
+            The spec is unclear about what should happen if the server doesn't want or is
+            unable to honour the request. Here's how the code handles it for now.
+
+            Contains the following additional element:
+                - Boolean (required) signalling whether the option should be turned on or off.
+
+            The subsequent call to ``handle`` expects the following dictionary:
+                'hardlock': (optional) boolean
+                    If present and False, the handler will hard fail. It will set codes 0x10 and 0x40
+                    and abort.
+                    In all other cases, the code will simply assume the server has complied.
+
+        suk
+        ^^^
+            Tells the server to send the stored Server Unlock Key.
+
+            This action contains no additional elements.
+
+            The subsequent call to ``handle`` expects the following dictionary:
+                'suk': (required) string
+                    The server must return the Server Unlock Key they stored with the user's identity.
+                    Failure to do so will throw an error.
         """
 
         #First check if we're in an ``ACTION`` state and process given data
@@ -244,6 +280,20 @@ class Request:
                         self.state = 'COMPLETE'
                     else:
                         raise ValueError("The server failed to respond adequately to the 'find' action. The handler expects a key 'found' and a value that is an array of one or more booleans.")
+                elif action[0] == 'sqrlonly':
+                    if ( ('sqrlonly' in args) and (args['sqrlonly'] == False) ):
+                        self._response.tifOn(0x10)
+                        self._response.tifOn(0x40)
+                        self.state = 'COMPLETE'
+                elif action[0] == 'hardlock':
+                    if ( ('hardlock' in args) and (args['hardlock'] == False) ):
+                        self._response.tifOn(0x10)
+                        self._response.tifOn(0x40)
+                        self.state = 'COMPLETE'
+                elif action[0] == 'suk':
+                    if ( ('suk' not in args) or (not isinstance(args['suk'], str)) or (len(args['suk'].strip()) == 0) ):
+                        raise ValueError("The server failed to provide the requested Server Unlock Key.")
+                    self._response.addParam('suk', args['suk'])
                 else:
                     raise ValueError('Unrecognized action ({}). This should never happen!'.format(action[0]))
             self.action = []
@@ -308,6 +358,8 @@ class Request:
         """Private method for extracting options and appending appropriate actions
         to the queue. It will fail unless the Request is currently in the 'VALID' state.
         It should only be called at the end of a non-query CMD session.
+
+        The 'cps' option is handled by the 'ident' CMD handler.
         """
         assert self.state == 'VALID'
         opts = self.params['client']['opt']

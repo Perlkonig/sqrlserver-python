@@ -370,3 +370,24 @@ def test_cmd_query():
     with pytest.raises(ValueError):
         req.handle({'found': None})
 
+def test_cmd_ident():
+    pass
+    #Need valid hashes that include 'cps'
+    key = nacl.utils.random(32)
+    nut = sqrlserver.Nut(key)
+    nutstr = nut.generate('1.2.3.4', 100, timestamp=time.time()-100).toString('qr')
+    #TODO: Need to generate valid hashes
+    params = {
+        'nut': nutstr,
+        'sfn': 'R1JD',
+        'can': 'aHR0cHM6Ly93d3cuZ3JjLmNvbS9zcXJsL2RpYWcuaHRt',
+        'client': 'dmVyPTENCmNtZD1xdWVyeQ0KaWRrPVRMcHlyb3dMaFdmOS1oZExMUFFPQS03LXhwbEk5TE94c2ZMWHN5VGNjVmMNCm9wdD1jcHN-c3VrDQo',
+        'server': 'c3FybDovL3d3dy5ncmMuY29tL3Nxcmw_bnV0PVpIUVNuYllXU0REVWo1NzBtc0l1VlEmc2ZuPVIxSkQmY2FuPWFIUjBjSE02THk5M2QzY3VaM0pqTG1OdmJTOXpjWEpzTDJScFlXY3VhSFJ0',
+        'ids': 'tCTr1DoEYANtxGE_        kRNHgSsHa87aRG9C0vNqy7h6CaV8tH5TnBJmdW0gbDsja1JsRbSNA4ZeFVUIfOnzdEz8DA'
+    }
+
+    #TODO: Need coverage for previous identities
+
+def test_opts():
+    pass
+

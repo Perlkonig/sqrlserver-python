@@ -16,6 +16,7 @@ class Response:
         self.thisver = ver
         self.suppver = '1'
         self._tif = 0
+        self.params = {}
 
     @property
     def tif(self):
@@ -30,6 +31,9 @@ class Response:
 
     def toString(self):
         pass
+
+    def addParam(self, key, value):
+        self.params[key] = value
 
     def tifOn(self, *args):
         """Turns on given status bits, if not already on.
