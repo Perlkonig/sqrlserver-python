@@ -8,6 +8,7 @@ import nacl.signing
 import nacl.encoding
 import nacl.hash
 from base64 import urlsafe_b64encode, urlsafe_b64decode
+import json
 
 class Request:
     """Class encompassing SQRL client requests
@@ -120,6 +121,9 @@ class Request:
         self.state = 'NEW'
         self.action = []
 
+    def __repr__(self):
+        return "<Request(key={}, ipaddr={}, ttl={}, mincounter={}, maxcounter={}, secure={}, hmac={}, params={}, state={}, action={})>".format(self.key, self.ipaddr, self.ttl, self.mincounter, self.maxcounter, self.secure, self.hmac, self.params, self.state, self.action)
+
     def handle(self, args={}):
         """The core request handler. After each call, it will set the ``state``
         property to either ``ACTION`` or ``COMPLETE``. The user is expected to keep 
@@ -163,7 +167,9 @@ class Request:
         confirm
         ^^^^^^^
             Means there is an issue with the nut. The server must confirm whether they wish
-            to proceed.
+            to proceed. It's important to let the server decide because (a) it might be 
+            expected that the IPs don't match (cross-device login) and (b) the "counter"
+            part of the nut could be used to store other types of information instead.
 
             Contains the following additional element:
                 - Array of strings representing possible issues:
@@ -197,6 +203,9 @@ class Request:
                     The presence of this key (regardless of value) means the primary identity 
                     is recognized but that the user disabled it. It cannot be used for 
                     authentication until reenabled or rekeyed.
+                'suk' : (dependent) string
+                    If the account is disabled, then you must provide the Server Unlock Key.
+                    Failure to do so will raise an exception.
         auth
         ^^^^
             Asks the server to officially authenticate the given user. 
@@ -207,13 +216,20 @@ class Request:
                   as a  "Client Provided Session"
 
             The subsequent call to ``handle`` expects the following dictionary:
-                'identified' : (required) boolean
+                'authenticated' : (required) boolean
                     If present and True, the handler will signal success to the client.
-                    In all other cases, the handler will signal an error of some kind.
+                    If present and False, the handler will signal an error.
+                    If not provided, the handler will throw an exception.
+                'url' : (optional) string
+                    If 'cps' was set, and the server supports it, it can pass a path
+                    to a pre-authenticated endpoint here (path only).
                 'disabled' : (optional) ANY
                     The presence of this key (regardless of value) means the primary identity 
                     is recognized but that the user disabled it. It cannot be used for 
                     authentication until reenabled or rekeyed.
+                'suk' : (dependent) string
+                    If the account is disabled, then you must provide the Server Unlock Key.
+                    Failure to do so will raise an exception.
 
         sqrlonly
         ^^^^^^^^
@@ -252,9 +268,33 @@ class Request:
             This action contains no additional elements.
 
             The subsequent call to ``handle`` expects the following dictionary:
-                'suk': (required) string
-                    The server must return the Server Unlock Key they stored with the user's identity.
-                    Failure to do so will throw an error.
+                'suk': (optional) string
+                    If the server knows this user, it must return the Server Unlock Key.
+
+        disable
+        ^^^^^^^
+            Tells the server to disable this SQRL identity.
+
+            Contains the following additional element:
+                - String (required) representing the SQRL identity
+
+            The subsequent call to ``handle`` expects the following dictionary:
+                'deactivated' : (required) boolean
+                    If present and True, the server is saying they have complied.
+                    If present and False, the user will be notified that the command was
+                    not completed. This could be because the account was already disabled
+                    or there was some other problem on the server side.
+                    If not present, an exception will be thrown.
+                    True implies 'found' is also True.
+                'disabled': (optional) ANY
+                    If present, the server is saying this account was already disabled.
+                    This is only sensical if 'deactivated' is set to False.
+                'suk' : (dependent) string
+                    If 'deactivated' is True or 'disabled' is present, you must provide
+                    the Server Unlock Key. Failure to do so will raise an exception.
+                'found' : (optional, recommended) boolean
+                    Only useful if 'deactivated' is False AND 'disabled' is absent.
+                    If present, signals whether the server recognizes this user.
         """
 
         #First check if we're in an ``ACTION`` state and process given data
@@ -274,33 +314,78 @@ class Request:
                             self._response.tifOn(0x01)
                             if 'disabled' in args:
                                 self._response.tifOn(0x08)
+                                if ( ('suk' not in args) or (not isinstance(args['suk'], str)) or (len(args['suk']) == 0) ):
+                                    raise ValueError("You must provide the Server Unlock Key if you encounter a disabled account.")
+                                self._response.addParam('suk', args['suk'])
                         if (len(args['found']) > 1):
                             if args['found'][1] == True:
                                 self._response.tifOn(0x02)
                         self.state = 'COMPLETE'
                     else:
                         raise ValueError("The server failed to respond adequately to the 'find' action. The handler expects a key 'found' and a value that is an array of one or more booleans.")
+                elif action[0] == 'auth':
+                    if ('authenticated' not in args):
+                        raise ValueError("The server failed to respond adequately to the 'ident' action. The handler expects the key 'authenticated' with a boolean value.")
+                    if args['authenticated']:
+                        self._response.tifOn(0x01)
+                        if 'url' in args:
+                            self._response.addParam('url', args['url'])
+                        self.state = 'COMPLETE'
+                    else:
+                        if 'disabled' in args:
+                            self._response.tifOn(0x01, 0x08, 0x40)
+                            if ( ('suk' not in args) or (not isinstance(args['suk'], str)) or (len(args['suk']) == 0) ):
+                                raise ValueError("You must provide the Server Unlock Key if you encounter a disabled account.")
+                            self._response.addParam('suk', args['suk'])
+                        else:
+                            self._response.tifOn(0x40, 0x80)
+                        self.state = 'COMPLETE'
+                elif action[0] == 'disable':
+                    if 'deactivated' not in args:
+                        raise ValueError("The server failed to respond adequately to the 'disable' action. The handler expects the key 'deactivated' with a boolean value.")
+                    if bool(args['deactivated']) ^ bool('disabled' in args):
+                        if ( ('suk' not in args) or (not isinstance(args['suk'], str)) or (len(args['suk']) == 0) ):
+                            raise ValueError("You must provide the Server Unlock Key if you encounter a disabled account.") 
+                        else:
+                            self._response.addParam('suk', args['suk'])
+
+                        if ( ('found' in args) and (args['found']) ):
+                            self._response.tifOn(0x01)
+
+                        if args['deactivated']:
+                            self._response.tifOn(0x01)
+                        else:
+                            self._response.tifOn(0x40)
+
+                        if 'disabled' in args:
+                            self._response.tifOn(0x01, 0x08, 0x40)
+
+                        self.state = 'COMPLETE'
+                    else:
+                        raise ValueError("In response to a 'disable' command, the server responded with neither or both 'deactivated' and 'disabled', which is not valid.")
                 elif action[0] == 'sqrlonly':
                     if ( ('sqrlonly' in args) and (args['sqrlonly'] == False) ):
-                        self._response.tifOn(0x10)
-                        self._response.tifOn(0x40)
+                        self._response.tifOn(0x10, 0x40)
                         self.state = 'COMPLETE'
                 elif action[0] == 'hardlock':
                     if ( ('hardlock' in args) and (args['hardlock'] == False) ):
-                        self._response.tifOn(0x10)
-                        self._response.tifOn(0x40)
+                        self._response.tifOn(0x10, 0x40)
                         self.state = 'COMPLETE'
                 elif action[0] == 'suk':
-                    if ( ('suk' not in args) or (not isinstance(args['suk'], str)) or (len(args['suk'].strip()) == 0) ):
-                        raise ValueError("The server failed to provide the requested Server Unlock Key.")
-                    self._response.addParam('suk', args['suk'])
+                    if 'suk' in args:
+                        self._response.addParam('suk', args['suk'])
                 else:
                     raise ValueError('Unrecognized action ({}). This should never happen!'.format(action[0]))
             self.action = []
 
         #Loop until we need additional information or are finished.
         #TODO: Need to prove there's no chance of an infinite loop, or rewrite.
+        #      For now I have a counter.
+        count = 0
         while self.state not in ['ACTION', 'COMPLETE']:
+            count += 1
+            if count > 5:
+                raise RuntimeError("Looks like an infinite loop. Here's the request:\n{}".format(self))
             if self.state == 'NEW':
                 #perform basic well-formedness checks and set state accordingly
                 wf = self.check_well_formedness()
@@ -346,6 +431,11 @@ class Request:
                             self.action.append(('auth', self.params['client']['idk'], 'cps'))
                         else:
                             self.action.append(('auth', self.params['client']['idk']))
+                        self._process_opts()
+                        self.state = 'ACTION'
+                    elif cmd == 'disable':
+                        self.action.append(('disable', self.params['client']['idk']))
+                        self.state = 'ACTION'
                     else:
                         raise RuntimeError("The supported command '{}' was unhandled! This should never happen! Please file a bug report!".format(cmd))
             else:

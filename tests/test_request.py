@@ -353,9 +353,10 @@ def test_cmd_query():
     #confirm with found but disabled
     req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
     req.handle()
-    req.handle({'found': [True], 'disabled': None})
+    req.handle({'found': [True], 'disabled': None, 'suk': 'SUK'})
     assert req.state == 'COMPLETE'
     assert req._response._tif == 0x01 + 0x04 + 0x08
+    assert req._response.params['suk'] == 'SUK'
 
     #confirm with not found
     req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
@@ -379,15 +380,81 @@ def test_cmd_ident():
     #TODO: Need to generate valid hashes
     params = {
         'nut': nutstr,
-        'sfn': 'R1JD',
-        'can': 'aHR0cHM6Ly93d3cuZ3JjLmNvbS9zcXJsL2RpYWcuaHRt',
-        'client': 'dmVyPTENCmNtZD1xdWVyeQ0KaWRrPVRMcHlyb3dMaFdmOS1oZExMUFFPQS03LXhwbEk5TE94c2ZMWHN5VGNjVmMNCm9wdD1jcHN-c3VrDQo',
-        'server': 'c3FybDovL3d3dy5ncmMuY29tL3Nxcmw_bnV0PVpIUVNuYllXU0REVWo1NzBtc0l1VlEmc2ZuPVIxSkQmY2FuPWFIUjBjSE02THk5M2QzY3VaM0pqTG1OdmJTOXpjWEpzTDJScFlXY3VhSFJ0',
-        'ids': 'tCTr1DoEYANtxGE_        kRNHgSsHa87aRG9C0vNqy7h6CaV8tH5TnBJmdW0gbDsja1JsRbSNA4ZeFVUIfOnzdEz8DA'
+        'client': 'dmVyPTENCmNtZD1pZGVudA0KaWRrPVRMcHlyb3dMaFdmOS1oZExMUFFPQS03LXhwbEk5TE94c2ZMWHN5VGNjVmMNCmlucz1kOHVNZUNGTC1sVGliSkJXVFVYcWZmWW9Xdjh2eko3alFrdXMwbHZ0Q1ZBDQpvcHQ9Y3BzfnN1aw0K',
+        'server': 'dmVyPTENCm51dD1YQXVYNFlXMkE5a21UMGQ2V2l3b3ZRDQp0aWY9QzUNCnFyeT0vc3FybD9udXQ9WEF1WDRZVzJBOWttVDBkNldpd292UQ0Kc3VrPVY2N280Y2IzOEtxNWY3aWphT21HUk5CTzBMTHdoVGQ1WUFubGRkVFh1UUENCnNpbj0wDQo',
+        'ids': 'aM8v2eVPjtjdrgTKqVmgmSwtiOjqCeeKH4QGPO8MckX6eaXe6BMbMYnxhMtyAJQCev6762YeWWn0o8t2cXibBA'
     }
 
     #TODO: Need coverage for previous identities
 
-def test_opts():
-    pass
+    req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
+    req.handle()
+    assert req.state == 'ACTION'
+    assert req.action == [
+        ('auth', 'TLpyrowLhWf9-hdLLPQOA-7-xplI9LOxsfLXsyTccVc', 'cps'), 
+        ('sqrlonly', False),
+        ('hardlock', False),
+        ('suk',)
+    ]
 
+    #successful auth
+    req.handle({'authenticated': True, 'suk': 'SUK'})
+    assert req.state == 'COMPLETE'
+    assert req._response._tif & 0x01
+    assert req._response.params['suk'] == 'SUK'
+
+    #successful auth with cps
+    req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
+    req.handle()
+    req.handle({'authenticated': True, 'suk': 'SUK', 'url': '/cpsurl'})
+    assert req.state == 'COMPLETE'
+    assert req._response._tif & 0x01
+    assert req._response.params['suk'] == 'SUK'
+    assert req._response.params['url'] == '/cpsurl'
+
+    #failed auth
+    req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
+    req.handle()
+    req.handle({'authenticated': False})
+    assert req.state == 'COMPLETE'
+    assert req._response._tif & 0x40
+    assert req._response._tif & 0x80
+
+    #failed auth due to disabled
+    req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
+    req.handle()
+    req.handle({'authenticated': False, 'disabled': True, 'suk': 'SUK'})
+    assert req.state == 'COMPLETE'
+    assert req._response._tif & 0x01
+    assert req._response._tif & 0x08
+    assert req._response._tif & 0x40
+    assert req._response.params['suk'] == 'SUK'
+
+    #disabled but no SUK given
+    with pytest.raises(ValueError):
+        req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
+        req.handle()
+        req.handle({'authenticated': False, 'disabled': True})
+
+    #ignored auth
+    with pytest.raises(ValueError):
+        req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
+        req.handle()
+        req.handle()
+
+def test_cmd_disable():
+    #TODO: Get reference hashes for testing
+
+    #Successful deactivation
+
+    #Failed deactivation
+
+    #Failed due to previously disabled
+
+    #both deactivated and disabled
+
+    #neither deactivated nor disabled
+
+    #ignored suk
+
+    pass
