@@ -100,77 +100,77 @@ def test_wellformed():
 
     #should register as well formed
     req = sqrlserver.Request(key, goodparams, ipaddr='1.2.3.4', maxcounter=105)
-    assert req.check_well_formedness() == True
+    assert req._check_well_formedness() == True
 
     #missing required params
     #nut
     badparams = dict(goodparams)
     del badparams['nut']
     req = sqrlserver.Request(key, badparams, ipaddr='1.2.3.4', maxcounter=105)
-    assert req.check_well_formedness() == False
+    assert req._check_well_formedness() == False
     #client
     badparams = dict(goodparams)
     del badparams['client']
     req = sqrlserver.Request(key, badparams, ipaddr='1.2.3.4', maxcounter=105)
-    assert req.check_well_formedness() == False
+    assert req._check_well_formedness() == False
     #server
     badparams = dict(goodparams)
     del badparams['server']
     assert isinstance(badparams['client'], str)
     req = sqrlserver.Request(key, badparams, ipaddr='1.2.3.4', maxcounter=105)
-    assert req.check_well_formedness() == False
+    assert req._check_well_formedness() == False
     #ids
     badparams = dict(goodparams)
     del badparams['ids']
     req = sqrlserver.Request(key, badparams, ipaddr='1.2.3.4', maxcounter=105)
-    assert req.check_well_formedness() == False
+    assert req._check_well_formedness() == False
 
     #"missing" optional param (should pass)
     badparams = dict(goodparams)
     del badparams['sfn']
     req = sqrlserver.Request(key, badparams, ipaddr='1.2.3.4', maxcounter=105)
-    assert req.check_well_formedness() == True
+    assert req._check_well_formedness() == True
 
     #missing required client params
     #ver
     badparams = dict(goodparams)
     badparams['client'] = 'Y21kPXF1ZXJ5DQppZGs9VExweXJvd0xoV2Y5LWhkTExQUU9BLTcteHBsSTlMT3hzZkxYc3lUY2NWYw0Kb3B0PWNwc35zdWsNCg'
     req = sqrlserver.Request(key, badparams, ipaddr='1.2.3.4', maxcounter=105)
-    assert req.check_well_formedness() == False
+    assert req._check_well_formedness() == False
     #cmd
     badparams = dict(goodparams)
     badparams['client'] = 'dmVyPTENCmlkaz1UTHB5cm93TGhXZjktaGRMTFBRT0EtNy14cGxJOUxPeHNmTFhzeVRjY1ZjDQpvcHQ9Y3BzfnN1aw0K'
     req = sqrlserver.Request(key, badparams, ipaddr='1.2.3.4', maxcounter=105)
-    assert req.check_well_formedness() == False
+    assert req._check_well_formedness() == False
     #idk
     badparams = dict(goodparams)
     badparams['client'] = 'dmVyPTENCmNtZD1xdWVyeQ0Kb3B0PWNwc35zdWsNCg'
     req = sqrlserver.Request(key, badparams, ipaddr='1.2.3.4', maxcounter=105)
-    assert req.check_well_formedness() == False
+    assert req._check_well_formedness() == False
 
     #unsupported version
     badparams = dict(goodparams)
     badparams['client'] = 'dmVyPTINCmNtZD1xdWVyeQ0KaWRrPVRMcHlyb3dMaFdmOS1oZExMUFFPQS03LXhwbEk5TE94c2ZMWHN5VGNjVmMNCm9wdD1jcHN-c3VrDQo'
     req = sqrlserver.Request(key, badparams, ipaddr='1.2.3.4', maxcounter=105)
-    assert req.check_well_formedness() == False
+    assert req._check_well_formedness() == False
 
     #unknown command
     badparams = dict(goodparams)
     badparams['client'] = 'dmVyPTENCmNtZD1raWxsDQppZGs9VExweXJvd0xoV2Y5LWhkTExQUU9BLTcteHBsSTlMT3hzZkxYc3lUY2NWYw0Kb3B0PWNwc35zdWsNCg'
     req = sqrlserver.Request(key, badparams, ipaddr='1.2.3.4', maxcounter=105)
-    assert req.check_well_formedness() == False
+    assert req._check_well_formedness() == False
 
     #no opt (should pass)
     badparams = dict(goodparams)
     badparams['client'] = 'dmVyPTENCmNtZD1xdWVyeQ0KaWRrPVRMcHlyb3dMaFdmOS1oZExMUFFPQS03LXhwbEk5TE94c2ZMWHN5VGNjVmMNCg'
     req = sqrlserver.Request(key, badparams, ipaddr='1.2.3.4', maxcounter=105)
-    assert req.check_well_formedness() == True
+    assert req._check_well_formedness() == True
 
     #unrecognized opt
     badparams = dict(goodparams)
     badparams['client'] = 'dmVyPTENCmNtZD1xdWVyeQ0KaWRrPVRMcHlyb3dMaFdmOS1oZExMUFFPQS03LXhwbEk5TE94c2ZMWHN5VGNjVmMNCm9wdD1jcHN-c3VrfmRpZQ0K'
     req = sqrlserver.Request(key, badparams, ipaddr='1.2.3.4', maxcounter=105)
-    assert req.check_well_formedness() == False
+    assert req._check_well_formedness() == False
 
 def test_validity():
     key = nacl.utils.random(32)
@@ -189,26 +189,26 @@ def test_validity():
 
     #Basic case should pass
     req = sqrlserver.Request(key, goodparams, ipaddr='1.2.3.4', maxcounter=105)
-    assert req.check_well_formedness() == True
-    assert len(req.check_validity()) == 0
+    assert req._check_well_formedness() == True
+    assert len(req._check_validity()) == 0
 
     #Pass with valid hmac
     req = sqrlserver.Request(key, goodparams, ipaddr='1.2.3.4', maxcounter=105, hmac=goodmac)
-    assert req.check_well_formedness() == True
-    assert len(req.check_validity()) == 0
+    assert req._check_well_formedness() == True
+    assert len(req._check_validity()) == 0
 
     #Fail with bad hmac
     req = sqrlserver.Request(key, goodparams, ipaddr='1.2.3.4', maxcounter=105, hmac=badmac)
-    assert req.check_well_formedness() == True
-    errs = req.check_validity()
+    assert req._check_well_formedness() == True
+    errs = req._check_validity()
     assert errs == ['hmac']
 
     #bad signature
     badparams = dict(goodparams)
     badparams['ids'] += 'a'
     req = sqrlserver.Request(key, badparams, ipaddr='1.2.3.4', maxcounter=105)
-    assert req.check_well_formedness() == True
-    errs = req.check_validity()
+    assert req._check_well_formedness() == True
+    errs = req._check_validity()
     assert errs == ['sigs']
 
     # GAP IN COVERAGE!
@@ -220,36 +220,36 @@ def test_validity():
     badnutstr = badnut.generate('1.2.3.4', 100).toString('qr')
     badparams['nut'] = badnutstr
     req = sqrlserver.Request(key, badparams, ipaddr='1.2.3.4', maxcounter=105)
-    assert req.check_well_formedness() == True
-    errs = req.check_validity()
+    assert req._check_well_formedness() == True
+    errs = req._check_validity()
     assert errs == ['nut']
 
     #nut issues
     badparams = dict(goodparams)
     #ipmismatch
     req = sqrlserver.Request(key, badparams, ipaddr='1.2.3.5')
-    assert req.check_well_formedness() == True
-    errs = req.check_validity()
+    assert req._check_well_formedness() == True
+    errs = req._check_validity()
     assert errs == ['ip']
     #not fresh
     req = sqrlserver.Request(key, badparams, ipaddr='1.2.3.4', ttl=10)
-    assert req.check_well_formedness() == True
-    errs = req.check_validity()
+    assert req._check_well_formedness() == True
+    errs = req._check_validity()
     assert errs == ['time']
     #counter too small
     req = sqrlserver.Request(key, badparams, ipaddr='1.2.3.4', mincounter=1000)
-    assert req.check_well_formedness() == True
-    errs = req.check_validity()
+    assert req._check_well_formedness() == True
+    errs = req._check_validity()
     assert errs == ['counter']
     #counter too big
     req = sqrlserver.Request(key, badparams, ipaddr='1.2.3.4', maxcounter=1)
-    assert req.check_well_formedness() == True
-    errs = req.check_validity()
+    assert req._check_well_formedness() == True
+    errs = req._check_validity()
     assert errs == ['counter']
     #how about all three?
     req = sqrlserver.Request(key, badparams, ipaddr='1.2.3.5', ttl=10, maxcounter=1)
-    assert req.check_well_formedness() == True
-    errs = req.check_validity()
+    assert req._check_well_formedness() == True
+    errs = req._check_validity()
     assert errs == ['ip', 'time', 'counter']
 
 def test_action_META():

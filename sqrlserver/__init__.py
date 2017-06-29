@@ -11,41 +11,32 @@ __version__ = '0.1.0'
 def url_generate(authority, path, nut, sfn, query=[], ext=0, secure=True):
     """Produces a valid SQRL link (LINK TO SPEC)
 
-    Parameters
-    ----------
-    authority : string
-        The authority part of the url the SQRL client will contact to authenticate.
-        Includes the username, password, domain, and port.
-        See RFC 3986, Jan 2005, section 3.2 (https://tools.ietf.org/html/rfc3986#section-3.2)
-    path : string
-        The path the SQRL client will contact to authenticate.
-    nut : string
-        Base64-encoded URL-safe string that is 
-          - opaque,
-          - reasonably unique, and
-          - cryptographically unpredictable.
-    sfn : string
-        The "server friendly name" the SQRL client will use to identify you to the user.
-    query : array of tuples
-        Each tuple represents additional name-value pairs the SQRL client will need to 
-        return when it tries to authenticate.
-    ext : int
-        If greater than zero, it signals to the SQRL client how much of the path should
-        be considered as part of the site's official identifier (LINK TO SPEC).
-        Defaults to 0.
-    secure : boolean
-        If True, uses the ``sqrl`` scheme, otherwise it uses ``qrl``.
-        Defaults to True.
+    Args: 
+        authority (string) : The authority part of the url the SQRL
+            client will contact to authenticate. Includes the username,
+            password, domain, and port. See RFC 3986, Jan 2005, section
+            3.2 (https://tools.ietf.org/html/rfc3986#section-3.2)
+        path (string): The path the SQRL client will contact to
+            authenticate.
+        nut (string) : Base64-encoded URL-safe string that is opaque,
+            reasonably unique, and cryptographically unpredictable.
+        sfn (string : The "server friendly name" the SQRL client will
+            use to identify you to the user.
+        query (list): Array of tuples, each representing additional
+            name-value pairs the SQRL client will need to return when it
+            tries to authenticate.
+        ext (int) : If greater than zero, it signals to the SQRL
+            client how much of the path should be considered as part of
+            the site's official identifier (LINK TO SPEC). Defaults to 0.
+        secure (bool) : If True, uses the ``sqrl`` scheme, otherwise
+            it uses ``qrl``. Defaults to True.
 
-    Returns
-    -------
-    string representing a valid SQRL URL
-        Query parameters will always appear in the following order:
-          - nut
-          - sfn
-          - x (if present)
-          - user-provided parameters in the order provided
+    Returns:
+        string : Valid SQRL URL. Query parameters will always appear
+            in the following order: nut, sfn, x (if present), user-provided
+            parameters in the order provided.
     """
+
     parts = []
     #scheme
     if secure:

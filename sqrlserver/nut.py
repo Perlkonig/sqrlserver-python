@@ -9,28 +9,37 @@ from bitstring import BitArray
 
 from .utils import pad, depad
 
-class Nut:
-    """A class encompassing SQRL nuts
+class Nut(object):
+    """A class encompassing SQRL nuts.
 
     Expected workflow is as follows:
         - Construct nut with key and nonce
         - If generating:
             - generate
             - toString
-        - If validating/queriying:
+        - If validating/querying:
             - load
             - validate
             - inspect
+
+    Attributes:
+        key (bytes) : 32 bytes used to encrypt the nut. 
+        ipmatch (bool) : Whether the last validation found matching IPs.
+        fresh (bool) : Whether the last validation found the nut to be fresh.
+        countersane (bool) : Whether the last validation found the
+            counter to be within limits. Default is False, even if counter
+            checking was disabled.
+        isqr (bool) : Set when loading a nut. States whether it's a QR nut.
+        islink (bool) : Set when loading a nut. States whether it's a link nut.
     """
 
     def __init__(self, key):
         """Constructor
 
-        Parameters
-        ----------
-        key : bytes
-            32-byte key
+        Args:
+            key (bytes) : 32-byte key used to encrypt/decrypt the nut
         """
+
         self.nuts = {'raw': None, 'qr': None, 'link': None}
         self.key = key
         self.ipmatch = False
@@ -42,17 +51,18 @@ class Nut:
     def generate(self, ipaddr, counter, timestamp=None):
         """Generates a unique nut using the technique described in the spec (LINK)
 
-        Parameters
-        ----------
-        ipaddr : string
-            The string representation of a valid IPv4 or IPv6 address.
-        counter : long
-            An incremental counter. Used for sanity checking.
-        timestamp : double
-            Unix timestamp. If None, current time is used.
+        Args:
+            ipaddr (string) : The string representation of a valid
+                IPv4 or IPv6 address.
+            counter (uint) : 
+                An incremental counter. Used for sanity checking.
 
-        Stores parameters in self, generates the raw bitstring, then stores
-        encrypted versions of the "qr" and "link" versions of the nut.
+        Keyword Args:
+            timestamp (uint) : Unix timestamp (seconds only). If None,
+                current time is used.
+
+        Returns:
+            Nut : The populated Nut object.
         """
 
         self.ip = ipaddress.ip_address(ipaddr)
@@ -92,10 +102,11 @@ class Nut:
     def load(self, nut):
         """Decrypts the given nut and extracts its parts.
 
-        Parameters
-        ----------
-        nut : string
-            A previously generated nut string
+        Args:
+            nut (string) : A previously generated nut string
+
+        Returns
+            Nut
         """
 
         #decrypt the nut
@@ -127,25 +138,27 @@ class Nut:
     def validate(self, ipaddr, ttl, maxcounter=None, mincounter=0):
         """Validates the currently loaded nut. 
 
-        The nut must be generated or loaded first. It is the user's responsiblity
-        to keep a list of valid nuts and reject repeats, to avoid replay attacks.
-        This routine only validates the data encoded into the nut.
+        The nut must be generated or loaded first. It is the user's
+        responsiblity to keep a list of valid nuts and reject repeats,
+        to avoid replay attacks. This routine only validates the data
+        encoded into the nut.
 
-        Populates the following properties:
-            - ipmatch
-            - fresh
-            - countersane
+        Args:
+            ipaddr (string) : The string representation of a valid
+                IPv4 or IPv6 address.
+            ttl (uint) : Number of seconds old the nut is allowed to be.
 
-        Parameters
-        ----------
-        ipaddr : string
-            The string representation of a valid IPv4 or IPv6 address.
-        ttl : long
-            Number of seconds old the nut is allowed to be
-        maxcounter : long
-            Current counter. If None, then no upper-bound checking will occur.
-        mincounter : long
-            Smallest counter value you're willing to accept.
+        Keyword Args:
+            maxcounter (uint) : Current counter. If None, then no
+                upper-bound checking will occur.
+            mincounter (uint) : Smallest counter value you're willing
+                to accept. If None, then no lower-bound checking will
+                occur
+
+        Returns:
+            Nut : The user has to inspect the attributes ``ipmatch``, 
+            ``fresh``, and ``countersane`` to determine if the nut fully 
+            validated.
         """
 
         #verify ipaddress
@@ -179,7 +192,19 @@ class Nut:
         return self
 
     def toString(self, flag):
-        """Converts the given nut to a base64url-encoded string"""
+        """Converts the given nut to a base64url-encoded string
+
+        Args:
+            flag (string) : One of ``qr``, ``link``, or ``raw``.
+
+        Warning:
+            While it is possible to do this to the "raw" nut, don't! It has 
+            not been encrypted.
+
+        Returns:
+            string : b64u-encoded nut
+        """
+
         if flag not in self.nuts:
             return None
         return depad(urlsafe_b64encode(self.nuts[flag]).decode('utf-8'))

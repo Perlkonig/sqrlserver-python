@@ -11,8 +11,7 @@ Contents:
 .. toctree::
    :maxdepth: 2
 
-   source/index
-
+   modules
 
 
 Indices and tables
