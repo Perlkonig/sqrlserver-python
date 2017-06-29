@@ -56,7 +56,7 @@ class Request(object):
 
             params (dict) : All the query parameters from the query string
                 and POST body.The following parameters must exist:
-                
+
                 - nut
                 - server
                 - client
@@ -307,18 +307,14 @@ class Request(object):
                     'deactivated' : (required) boolean
                         If present and True, the server is saying they have complied.
                         If present and False, the user will be notified that the command was
-                        not completed. This could be because the account was already disabled
-                        or there was some other problem on the server side.
+                        not completed. 
                         If not present, an exception will be thrown.
                         True implies 'found' is also True.
-                    'disabled': (optional) ANY
-                        If present, the server is saying this account was already disabled.
-                        This is only sensical if 'deactivated' is set to False.
                     'suk' : (dependent) string
                         If 'deactivated' is True or 'disabled' is present, you must provide
                         the Server Unlock Key. Failure to do so will raise an exception.
                     'found' : (optional, recommended) boolean
-                        Only useful if 'deactivated' is False AND 'disabled' is absent.
+                        Only useful if 'deactivated' is False.
                         If present, signals whether the server recognizes this user.
         """
 
@@ -368,7 +364,7 @@ class Request(object):
                 elif action[0] == 'disable':
                     if 'deactivated' not in args:
                         raise ValueError("The server failed to respond adequately to the 'disable' action. The handler expects the key 'deactivated' with a boolean value.")
-                    if bool(args['deactivated']) ^ bool('disabled' in args):
+                    if args['deactivated']:
                         if ( ('suk' not in args) or (not isinstance(args['suk'], str)) or (len(args['suk']) == 0) ):
                             raise ValueError("You must provide the Server Unlock Key if you encounter a disabled account.") 
                         else:
@@ -381,9 +377,6 @@ class Request(object):
                             self._response.tifOn(0x01, 0x08)
                         else:
                             self._response.tifOn(0x40)
-
-                        if 'disabled' in args:
-                            self._response.tifOn(0x01, 0x08, 0x40)
 
                         self.state = 'COMPLETE'
                     else:
