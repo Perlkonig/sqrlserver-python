@@ -553,6 +553,37 @@ def test_cmd_enable():
         ('suk',)
     ]
 
+    #Enabled True
+    req.handle({'activated': True})
+    assert req.state == 'COMPLETE'
+    assert req._response._tif & 0x01
+    assert not req._response._tif & 0x40
+
+    #Enabled False, found False
+    req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
+    req.handle()
+    req.handle({'vuk': '3gyFVqlNogtpKscrDy7sopPk3xasMisEnAJdSniioE4'})
+    req.handle({'activated': False})
+    assert req.state == 'COMPLETE'
+    assert not req._response._tif & 0x01
+    assert req._response._tif & 0x40
+
+    #Enabled False, found True
+    req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
+    req.handle()
+    req.handle({'vuk': '3gyFVqlNogtpKscrDy7sopPk3xasMisEnAJdSniioE4'})
+    req.handle({'activated': False, 'found': True})
+    assert req.state == 'COMPLETE'
+    assert req._response._tif & 0x01
+    assert req._response._tif & 0x40
+
+    #Enabled omitted
+    with pytest.raises(ValueError):
+        req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
+        req.handle()
+        req.handle({'vuk': '3gyFVqlNogtpKscrDy7sopPk3xasMisEnAJdSniioE4'})
+        req.handle({'found': True})
+
     #Signature fail
     req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
     req.handle()
@@ -579,12 +610,43 @@ def test_cmd_remove():
     assert req.state == 'ACTION'
     assert req.action == [('vuk',)]
 
-    #Handing a valid VUK asks for enabling
+    #Handing a valid VUK asks for removing
     req.handle({'vuk': '3gyFVqlNogtpKscrDy7sopPk3xasMisEnAJdSniioE4'})
     assert req.state == 'ACTION'
     assert req.action == [
         ('remove', 'TLpyrowLhWf9-hdLLPQOA-7-xplI9LOxsfLXsyTccVc'), 
     ]
+
+    #Removed True
+    req.handle({'removed': True})
+    assert req.state == 'COMPLETE'
+    assert not req._response._tif & 0x01
+    assert not req._response._tif & 0x40
+
+    #Removed False, found False
+    req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
+    req.handle()
+    req.handle({'vuk': '3gyFVqlNogtpKscrDy7sopPk3xasMisEnAJdSniioE4'})
+    req.handle({'removed': False})
+    assert req.state == 'COMPLETE'
+    assert not req._response._tif & 0x01
+    assert req._response._tif & 0x40
+
+    #Removed False, found True
+    req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
+    req.handle()
+    req.handle({'vuk': '3gyFVqlNogtpKscrDy7sopPk3xasMisEnAJdSniioE4'})
+    req.handle({'removed': False, 'found': True})
+    assert req.state == 'COMPLETE'
+    assert req._response._tif & 0x01
+    assert req._response._tif & 0x40
+
+    #Removed omitted
+    with pytest.raises(ValueError):
+        req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
+        req.handle()
+        req.handle({'vuk': '3gyFVqlNogtpKscrDy7sopPk3xasMisEnAJdSniioE4'})
+        req.handle({'found': True})
 
     #Signature fail
     req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
