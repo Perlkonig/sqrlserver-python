@@ -467,7 +467,6 @@ def test_cmd_ident():
         req.handle()
 
 def test_cmd_disable():
-    #TODO: Get reference hashes for testing
     key = nacl.utils.random(32)
     nut = sqrlserver.Nut(key)
     nutstr = nut.generate('1.2.3.4', 100, timestamp=time.time()-100).toString('qr')
@@ -525,4 +524,75 @@ def test_cmd_disable():
         req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
         req.handle()
         req.handle({'deactivated': True})
+
+def test_cmd_enable():
+    key = nacl.utils.random(32)
+    nut = sqrlserver.Nut(key)
+    nutstr = nut.generate('1.2.3.4', 100, timestamp=time.time()-100).toString('qr')
+    params = {
+        'nut': nutstr,
+        'client': 'dmVyPTENCmNtZD1lbmFibGUNCmlkaz1UTHB5cm93TGhXZjktaGRMTFBRT0EtNy14cGxJOUxPeHNmTFhzeVRjY1ZjDQpvcHQ9Y3BzfnN1aw0K',
+        'server': 'dmVyPTENCm51dD1SeXJCQTBIWlBSU1hWSEN1WlhIazRBDQp0aWY9RA0KcXJ5PS9zcXJsP251dD1SeXJCQTBIWlBSU1hWSEN1WlhIazRBDQpzdWs9Y3FIdkpxb3E3UHlyQkk5eUFodEdqQmtsSTMxR2s1dmtycTBhTkFXbkpCWQ0K',
+        'ids': 'hcH_mt4XTxbQDXIvNPY1qFI6bAKMV3QrAJEeQ91Pl0fR89dnV11YysZA9_yPvqsKHXBen4WB3fELiBFTgCakBA',
+        'urs': '8ciKHSOHX2uZh3QYVsya7wbvyq-D0MDLccOWC1yKcXtSAdsUjvseGLvvuXqUQhxBpsMVWNnpCcRFWibbwkbvAg'
+    }
+
+    #Initial request asks for VUK
+    req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
+    req.handle()
+    assert req.state == 'ACTION'
+    assert req.action == [('vuk',)]
+
+    #Handing a valid VUK asks for enabling
+    req.handle({'vuk': '3gyFVqlNogtpKscrDy7sopPk3xasMisEnAJdSniioE4'})
+    assert req.state == 'ACTION'
+    assert req.action == [
+        ('enable', 'TLpyrowLhWf9-hdLLPQOA-7-xplI9LOxsfLXsyTccVc'), 
+        ('sqrlonly', False),
+        ('hardlock', False),
+        ('suk',)
+    ]
+
+    #Signature fail
+    req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
+    req.handle()
+    req.handle({'vuk': '3gyFVqlNogtpKscrDy7sopPk3xasMisEnAJdSniioe4'})
+    assert req.state == 'COMPLETE'
+    assert req._response._tif & 0x40
+    assert req._response._tif & 0x80
+
+def test_cmd_remove():
+    key = nacl.utils.random(32)
+    nut = sqrlserver.Nut(key)
+    nutstr = nut.generate('1.2.3.4', 100, timestamp=time.time()-100).toString('qr')
+    params = {
+        'nut': nutstr,
+        'client': 'dmVyPTENCmNtZD1yZW1vdmUNCmlkaz1UTHB5cm93TGhXZjktaGRMTFBRT0EtNy14cGxJOUxPeHNmTFhzeVRjY1ZjDQpvcHQ9Y3BzfnN1aw0K',
+        'server': 'dmVyPTENCm51dD1ZcWN3d1BpSDZ6UnFFNTZqMWdsZGZBDQp0aWY9NQ0KcXJ5PS9zcXJsP251dD1ZcWN3d1BpSDZ6UnFFNTZqMWdsZGZBDQpzdWs9Y3FIdkpxb3E3UHlyQkk5eUFodEdqQmtsSTMxR2s1dmtycTBhTkFXbkpCWQ0K',
+        'ids': 'af4KG_JEKyNtIQEDRvwAxlky3aTmIMaGkBd81auAr22Uc_EE2OpQttmuh5gyLNHgt3AXwVmpI-c-u3czKVYlDQ',
+        'urs': 'B7wCzP2SXT7ALmUE35ymGc8fJ739_3kdx-fAEH5Hb1dggwPqOaChLXOXVruGFlVE5rqqEwbtgkbiDOVtAYmqCA'
+    }
+
+    #Initial request asks for VUK
+    req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
+    req.handle()
+    assert req.state == 'ACTION'
+    assert req.action == [('vuk',)]
+
+    #Handing a valid VUK asks for enabling
+    req.handle({'vuk': '3gyFVqlNogtpKscrDy7sopPk3xasMisEnAJdSniioE4'})
+    assert req.state == 'ACTION'
+    assert req.action == [
+        ('remove', 'TLpyrowLhWf9-hdLLPQOA-7-xplI9LOxsfLXsyTccVc'), 
+    ]
+
+    #Signature fail
+    req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
+    req.handle()
+    req.handle({'vuk': '3gyFVqlNogtpKscrDy7sopPk3xasMisEnAJdSniioe4'})
+    assert req.state == 'COMPLETE'
+    assert req._response._tif & 0x40
+    assert req._response._tif & 0x80
+
+
 

@@ -37,7 +37,7 @@ class Request(object):
 
     supported_versions = ['1']
     known_cmds = ['query', 'ident', 'disable', 'enable', 'remove']  
-    supported_cmds = ['query', 'ident', 'disable']
+    supported_cmds = ['query', 'ident', 'disable', 'enable', 'remove']
     known_opts = ['sqrlonly', 'hardlock', 'cps', 'suk']
     supported_opts = ['sqrlonly', 'hardlock', 'cps', 'suk']
 
@@ -128,6 +128,7 @@ class Request(object):
         self._response = Response()
         self.params = dict(params)
         self.key = key
+        self.admin = False
 
         #set initial state 
         self.state = 'NEW'
@@ -322,6 +323,49 @@ class Request(object):
                     'found' : (optional, recommended) boolean
                         Only useful if 'deactivated' is False.
                         If present, signals whether the server recognizes this user.
+
+            *vuk*
+
+                Tells the server to send the Verify Unlock Key. This is needed
+                for account recovery functions like 'enable' and 'remove'.
+
+                This action contains no additional elements.
+
+                The subsequent call to ``handle`` expects the following dictionary:
+                    'vuk' : (required) string or None
+                        If None, then the server is asserting it doesn't
+                        have the VUK. A client error will be flagged.
+                        Will raise an exception if the key doesen't exist at all.
+
+            *enable*
+
+                Tells the server to enable the given account. 
+
+                Contains the following additional element:
+                    'activated' : (required) boolean
+                        If present and True, the server is saying they have complied.
+                        If present and False, the user will be notified 
+                        that the command was not completed.
+                        If not present, an exception will be thrown.
+                        True implies 'found' is also True.
+                    'found' : (optional, recommended) boolean
+                        Only useful if 'activated' is False.
+                        If present, signals whether the server recognizes this user.
+
+            *remove*
+
+                Tells the server to remove the given account. 
+
+                Contains the following additional element:
+                    'removed' : (required) boolean
+                        If present and True, the server is saying they have complied.
+                        If present and False, the user will be notified 
+                        that the command was not completed.
+                        If not present, an exception will be thrown.
+                        True implies 'found' is also True.
+                    'found' : (optional, recommended) boolean
+                        Only useful if 'removed' is False.
+                        If present, signals whether the server recognizes this user.
         """
 
         #First check if we're in an ``ACTION`` state and process given data
@@ -394,6 +438,45 @@ class Request(object):
                 elif action[0] == 'suk':
                     if 'suk' in args:
                         self._response.addParam('suk', args['suk'])
+                elif action[0] == 'vuk':
+                    if 'vuk' not in args:
+                        raise ValueError("The server failed to adequately respond to the 'vuk' action. The handler expects either the stored VUK or None if the user isn't recognized.")
+                    if args['vuk'] is None:
+                        self._response.tifOn(0x40, 0x80)
+                        self.state = 'COMPLETE'
+                    else:
+                        if 'urs' not in self.params:
+                            self._response.tifOn(0x40, 0x80)
+                            self.state = 'COMPLETE'
+                        else:
+                            if Request._signature_valid(self._tosign, args['vuk'], self.params['urs']):
+                                self.admin = True
+                                self.state = 'VALID'
+                            else:
+                                self._response.tifOn(0x40, 0x80)
+                                self.state = 'COMPLETE'
+                elif action[0] == 'enable':
+                    if 'activated' not in args:
+                        raise ValueError("The server failed to respond adequately to the 'enable' action. The handler expects the key 'activated' with a boolean value.")
+                    if args['activated']:
+                        self._response.tifOn(0x01)
+                        self.state = 'COMPLETE'
+                    else:
+                        if ( ('found' in args) and (args['found']) ):
+                            self._response.tifOn(0x01)
+                        self._response.tifOn(0x40)
+                        self.state = 'COMPLETE'
+                elif action[0] == 'remove':
+                    if 'removed' not in args:
+                        raise ValueError("The server failed to respond adequately to the 'remove' action. The handler expects the key 'removed' with a boolean value.")
+                    if args['removed']:
+                        self._response.tifOff(0x01)
+                        self.state = 'COMPLETE'
+                    else:
+                        if ( ('found' in args) and (args['found']) ):
+                            self._response.tifOn(0x01)
+                        self._response.tifOn(0x40)
+                        self.state = 'COMPLETE'
                 else:
                     raise ValueError('Unrecognized action ({}). This should never happen!'.format(action[0]))
             self.action = []
@@ -466,8 +549,20 @@ class Request(object):
                         self._process_opts()
                         self.state = 'ACTION'
                     elif cmd == 'enable':
-
-                        pass
+                        if self.admin:
+                            self.action.append(('enable', self.params['client']['idk']))
+                            self._process_opts()
+                            self.state = 'ACTION'
+                        else:
+                            self.action.append(('vuk',))
+                            self.state = 'ACTION'
+                    elif cmd == 'remove':
+                        if self.admin:
+                            self.action.append(('remove', self.params['client']['idk']))
+                            self.state = 'ACTION'
+                        else:
+                            self.action.append(('vuk',))
+                            self.state = 'ACTION'
                     else:
                         raise RuntimeError("The supported command '{}' was unhandled! This should never happen! Please file a bug report!".format(cmd))
             else:
