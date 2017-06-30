@@ -381,14 +381,38 @@ def test_cmd_ident():
         'server': 'dmVyPTENCm51dD1YQXVYNFlXMkE5a21UMGQ2V2l3b3ZRDQp0aWY9QzUNCnFyeT0vc3FybD9udXQ9WEF1WDRZVzJBOWttVDBkNldpd292UQ0Kc3VrPVY2N280Y2IzOEtxNWY3aWphT21HUk5CTzBMTHdoVGQ1WUFubGRkVFh1UUENCnNpbj0wDQo',
         'ids': 'aM8v2eVPjtjdrgTKqVmgmSwtiOjqCeeKH4QGPO8MckX6eaXe6BMbMYnxhMtyAJQCev6762YeWWn0o8t2cXibBA'
     }
+    newuserparams = {
+        'nut': nutstr,
+        'client': 'dmVyPTENCmNtZD1pZGVudA0KaWRrPVRMcHlyb3dMaFdmOS1oZExMUFFPQS03LXhwbEk5TE94c2ZMWHN5VGNjVmMNCnN1az1XNnF5Um9XOEZveTI1YW9UeDkxcFdsRlRrX3JidWsycEExVXdUOGlmVXdnDQp2dWs9YjFaZVFTVlNMaTFUdnZ6RDNMNHV5cTAyNlRZSmdqY3JEMWRoQXhqWTRvWQ0Kb3B0PWNwc35zdWsNCg',
+        'server': 'dmVyPTENCm51dD0yYzN6RnNQSkNaN1NwUzRPZUlnMGNBDQp0aWY9NA0KcXJ5PS9zcXJsP251dD0yYzN6RnNQSkNaN1NwUzRPZUlnMGNBDQo',
+        'ids': 'lAW6MpZoSlO3_rhfDPwEWpJYvNmbJ23METdC6WnliJSEk3qnQaYei5ADiv6ThbMitkEtSiRwAAmxfJDZxfJiCw'
+    }
 
     #TODO: Need coverage for previous identities
 
+    #new user
+    req = sqrlserver.Request(key, newuserparams, ipaddr='1.2.3.4')
+    req.handle()
+    assert req.state == 'ACTION'
+    assert req.action == [
+        (
+            'auth', 
+            'TLpyrowLhWf9-hdLLPQOA-7-xplI9LOxsfLXsyTccVc', 
+            'W6qyRoW8Foy25aoTx91pWlFTk_rbuk2pA1UwT8ifUwg',
+            'b1ZeQSVSLi1TvvzD3L4uyq026TYJgjcrD1dhAxjY4oY',
+            'cps',
+        ), 
+        ('sqrlonly', False),
+        ('hardlock', False),
+        ('suk',)
+    ]
+
+    #known user
     req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
     req.handle()
     assert req.state == 'ACTION'
     assert req.action == [
-        ('auth', 'TLpyrowLhWf9-hdLLPQOA-7-xplI9LOxsfLXsyTccVc', 'cps'), 
+        ('auth', 'TLpyrowLhWf9-hdLLPQOA-7-xplI9LOxsfLXsyTccVc', None, None, 'cps'), 
         ('sqrlonly', False),
         ('hardlock', False),
         ('suk',)
@@ -410,6 +434,7 @@ def test_cmd_ident():
     assert not req._response._tif & 0x40    #command was indeed completed
     assert req._response.params['suk'] == 'SUK'
     assert req._response.params['url'] == '/cpsurl'
+
 
     #failed auth
     req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')

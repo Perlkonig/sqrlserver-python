@@ -225,9 +225,15 @@ class Request(object):
             *auth*
 
                 Asks the server to officially authenticate the given user. 
+                If the user is not already recognized, then this should be
+                taken as a request to create a new account. In this case the
+                SUK and VUK *must* be present. The server saves the three
+                keys, creates the account, and authenticates the user.
 
                 Contains the following additional elements:
-                    - String (required) representing the SQRL identity
+                    - String (required) representing the Identity Key (IDK)
+                    - String or None (required) the Server Unlock Key (SUK)
+                    - String or None (required) the Verify Unlock Key (VUK)
                     - String constant ``cps`` (optional) requesting
                       that the auth be handled as a  "Client Provided
                       Session"
@@ -441,10 +447,18 @@ class Request(object):
                             keys.append(self.params['client']['pidk'])
                         self.action.append(('find', keys))
                     elif cmd == 'ident':
-                        if 'cps' in self.params['client']['opt']:
-                            self.action.append(('auth', self.params['client']['idk'], 'cps'))
+                        act = ['auth', self.params['client']['idk']]
+                        if 'suk' in self.params['client']:
+                            act.append(self.params['client']['suk'])
                         else:
-                            self.action.append(('auth', self.params['client']['idk']))
+                            act.append(None)
+                        if 'vuk' in self.params['client']:
+                            act.append(self.params['client']['vuk'])
+                        else:
+                            act.append(None)
+                        if 'cps' in self.params['client']['opt']:
+                            act.append('cps')
+                        self.action.append(tuple(act))
                         self._process_opts()
                         self.state = 'ACTION'
                     elif cmd == 'disable':
@@ -452,7 +466,7 @@ class Request(object):
                         self._process_opts()
                         self.state = 'ACTION'
                     elif cmd == 'enable':
-                        
+
                         pass
                     else:
                         raise RuntimeError("The supported command '{}' was unhandled! This should never happen! Please file a bug report!".format(cmd))
