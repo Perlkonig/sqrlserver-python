@@ -37,7 +37,7 @@ class Request(object):
 
     supported_versions = ['1']
     known_cmds = ['query', 'ident', 'disable', 'enable', 'remove']  
-    supported_cmds = ['query', 'ident']
+    supported_cmds = ['query', 'ident', 'disable']
     known_opts = ['sqrlonly', 'hardlock', 'cps', 'suk']
     supported_opts = ['sqrlonly', 'hardlock', 'cps', 'suk']
 
@@ -311,8 +311,8 @@ class Request(object):
                         If not present, an exception will be thrown.
                         True implies 'found' is also True.
                     'suk' : (dependent) string
-                        If 'deactivated' is True or 'disabled' is present, you must provide
-                        the Server Unlock Key. Failure to do so will raise an exception.
+                        If 'deactivated' is True , you must provide the Server 
+                        Unlock Key. Failure to do so will raise an exception.
                     'found' : (optional, recommended) boolean
                         Only useful if 'deactivated' is False.
                         If present, signals whether the server recognizes this user.
@@ -370,17 +370,13 @@ class Request(object):
                         else:
                             self._response.addParam('suk', args['suk'])
 
-                        if ( ('found' in args) and (args['found']) ):
-                            self._response.tifOn(0x01)
-
-                        if args['deactivated']:
-                            self._response.tifOn(0x01, 0x08)
-                        else:
-                            self._response.tifOn(0x40)
-
+                        self._response.tifOn(0x01, 0x08)
                         self.state = 'COMPLETE'
                     else:
-                        raise ValueError("In response to a 'disable' command, the server responded with neither or both 'deactivated' and 'disabled', which is not valid.")
+                        if ( ('found' in args) and (args['found']) ):
+                            self._response.tifOn(0x01)
+                        self._response.tifOn(0x40)
+                        self.state = 'COMPLETE'
                 elif action[0] == 'sqrlonly':
                     if ( ('sqrlonly' in args) and (args['sqrlonly'] == False) ):
                         self._response.tifOn(0x10, 0x40)
@@ -453,7 +449,11 @@ class Request(object):
                         self.state = 'ACTION'
                     elif cmd == 'disable':
                         self.action.append(('disable', self.params['client']['idk']))
+                        self._process_opts()
                         self.state = 'ACTION'
+                    elif cmd == 'enable':
+                        
+                        pass
                     else:
                         raise RuntimeError("The supported command '{}' was unhandled! This should never happen! Please file a bug report!".format(cmd))
             else:

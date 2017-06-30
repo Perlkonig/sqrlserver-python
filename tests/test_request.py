@@ -372,12 +372,9 @@ def test_cmd_query():
         req.handle({'found': None})
 
 def test_cmd_ident():
-    pass
-    #Need valid hashes that include 'cps'
     key = nacl.utils.random(32)
     nut = sqrlserver.Nut(key)
     nutstr = nut.generate('1.2.3.4', 100, timestamp=time.time()-100).toString('qr')
-    #TODO: Need to generate valid hashes
     params = {
         'nut': nutstr,
         'client': 'dmVyPTENCmNtZD1pZGVudA0KaWRrPVRMcHlyb3dMaFdmOS1oZExMUFFPQS03LXhwbEk5TE94c2ZMWHN5VGNjVmMNCmlucz1kOHVNZUNGTC1sVGliSkJXVFVYcWZmWW9Xdjh2eko3alFrdXMwbHZ0Q1ZBDQpvcHQ9Y3BzfnN1aw0K',
@@ -401,6 +398,7 @@ def test_cmd_ident():
     req.handle({'authenticated': True, 'suk': 'SUK'})
     assert req.state == 'COMPLETE'
     assert req._response._tif & 0x01
+    assert not req._response._tif & 0x40    #command was indeed completed
     assert req._response.params['suk'] == 'SUK'
 
     #successful auth with cps
@@ -409,6 +407,7 @@ def test_cmd_ident():
     req.handle({'authenticated': True, 'suk': 'SUK', 'url': '/cpsurl'})
     assert req.state == 'COMPLETE'
     assert req._response._tif & 0x01
+    assert not req._response._tif & 0x40    #command was indeed completed
     assert req._response.params['suk'] == 'SUK'
     assert req._response.params['url'] == '/cpsurl'
 
@@ -444,17 +443,61 @@ def test_cmd_ident():
 
 def test_cmd_disable():
     #TODO: Get reference hashes for testing
+    key = nacl.utils.random(32)
+    nut = sqrlserver.Nut(key)
+    nutstr = nut.generate('1.2.3.4', 100, timestamp=time.time()-100).toString('qr')
+    params = {
+        'nut': nutstr,
+        'client': 'dmVyPTENCmNtZD1kaXNhYmxlDQppZGs9VExweXJvd0xoV2Y5LWhkTExQUU9BLTcteHBsSTlMT3hzZkxYc3lUY2NWYw0Kb3B0PWNwc35zdWsNCg',
+        'server': 'dmVyPTENCm51dD10TkdMczN3RXRoNE8xanhVY1BvYkN3DQp0aWY9NQ0KcXJ5PS9zcXJsP251dD10TkdMczN3RXRoNE8xanhVY1BvYkN3DQpzdWs9VjY3bzRjYjM4S3E1ZjdpamFPbUdSTkJPMExMd2hUZDVZQW5sZGRUWHVRQQ0K',
+        'ids': 'rU_Qitm8U_GM6enUj0V8Oag5IxmCmwBHx3O-sxovwN_T59qsgjLIP8LaYFFi0ysBZqmq8E3vw9Vzm-xNM54OBw'
+    }
+
+    #Initial request
+    req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
+    req.handle()
+    assert req.state == 'ACTION'
+    assert req.action == [
+        ('disable', 'TLpyrowLhWf9-hdLLPQOA-7-xplI9LOxsfLXsyTccVc'), 
+        ('sqrlonly', False),
+        ('hardlock', False),
+        ('suk',)
+    ]
 
     #Successful deactivation
+    req.handle({'deactivated': True, 'suk': 'SUK', 'found': True})
+    assert req.state == 'COMPLETE'
+    assert req._response._tif & 0x01    #user known
+    assert req._response._tif & 0x08    #account disabled
+    assert not req._response._tif & 0x40    #command was indeed completed
 
-    #Failed deactivation
+    #Failed deactivation and user not known
+    req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
+    req.handle()
+    req.handle({'deactivated': False})
+    assert req.state == 'COMPLETE'
+    assert not req._response._tif & 0x01
+    assert not req._response._tif & 0x08
+    assert req._response._tif & 0x40    
 
-    #Failed due to previously disabled
+    #Failed deactivation but user known
+    req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
+    req.handle()
+    req.handle({'deactivated': False, 'found': True, 'suk': 'SUK'})
+    assert req.state == 'COMPLETE'
+    assert req._response._tif & 0x01
+    assert not req._response._tif & 0x08
+    assert req._response._tif & 0x40    
 
-    #both deactivated and disabled
+    #Command ignored
+    with pytest.raises(ValueError):
+        req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
+        req.handle()
+        req.handle({'suk': 'SUK'})
 
-    #neither deactivated nor disabled
+    #suk ignored
+    with pytest.raises(ValueError):
+        req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
+        req.handle()
+        req.handle({'deactivated': True})
 
-    #ignored suk
-
-    pass

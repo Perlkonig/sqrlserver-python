@@ -1,4 +1,5 @@
 import nacl.hash
+from bitstring import BitArray
 
 class Response:
     """Class encompassing a response to a SQRL request"""
@@ -17,6 +18,9 @@ class Response:
         self.suppver = '1'
         self._tif = 0
         self.params = {}
+
+    def __repr__(self):
+        return "<Response(TIF={}, params={})>".format(hex(self._tif), self.params)
 
     @property
     def tif(self):
