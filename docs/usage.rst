@@ -28,7 +28,7 @@ The :py:class:`.Request` class acts as a simple state machine. Its ``state`` can
 - NEW (initial state, no processing has been done)
 - WELLFORMED (initial well-formedness checks have been done and passed)
 - VALID (initial validity tests have been done and passed; while in this state, the request will process client-submitted commands)
-- ACTION (the user needs to provide additional information)
+- ACTION (the server needs to provide additional information)
 - COMPLETE (end state; finalize and return the response)
 
 Step 3: Handle the Request
