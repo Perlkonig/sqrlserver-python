@@ -13,7 +13,7 @@ class Nut(object):
     """A class encompassing SQRL nuts.
 
     Expected workflow is as follows:
-        - Construct nut with key and nonce
+        - Construct nut with key 
         - If generating:
             - generate
             - toString

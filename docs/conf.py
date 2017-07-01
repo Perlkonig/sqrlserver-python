@@ -42,7 +42,7 @@ extensions = [
 ]
 
 napoleon_google_docstring = True
-napoleon_include_init_with_doc = True
+napoleon_include_init_with_doc = False
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -59,7 +59,7 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = 'SQRL Server (Python)'
+project = 'SQRL Server'
 copyright = '2017, Aaron Dalton'
 author = 'Aaron Dalton'
 

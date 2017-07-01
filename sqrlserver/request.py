@@ -1,4 +1,4 @@
-from .utils import pad, depad, stripurl
+from .utils import pad, depad, stripurl, addquery, delquery
 from .response import Response
 from .nut import Nut
 import ipaddress
@@ -33,6 +33,54 @@ class Request(object):
         - COMPLETE means that all processing that can be done has been
           done. You can finalize and return the response, which will
           include the necessary status codes for the client.
+
+    Note:
+        Errors in the \**kwargs will result in a thrown
+        ValueError. Any other errors that arise not from client
+        input also result in thrown errors. All client-related
+        errors are communicated through the Response object.
+    
+    Args:
+        key (bytes) : 32-byte encryption key. Must be the same as
+            what you used to encrypt the nut.
+
+        params (dict) : All the query parameters from the query string
+            and POST body. 
+
+            The following parameters must exist:
+
+            - nut
+            - server
+            - client
+            - ids
+
+            Depending on the content of these, additional parameters
+            may also be needed. Missing or malformed parameters will
+            result in an error response.
+
+    Keyword Args:
+        ipaddr (string) : String representation of the valid IPv4
+            or IPv6 address the request came from. Defaults to
+            '0.0.0.0'.
+        ttl (uint) : Required. The maximum acceptable age in
+            seconds of the submitted nut. Defaults to 600 (10
+            minutes).
+        maxcounter (uint) : The maximum acceptable counter value
+            in the submitted nut. Defaults to None, which disables
+            upper-limit checking of the counter.
+        mincounter (uint) : The minimum acceptable counter value
+            in the submitted nut. Defaults to None, which disables
+            lower-limit checking of the counter.
+        secure (bool) : Whether the request was received via SSL.
+            Defaults to True.
+        hmac (string) : The response object emits a keyed MAC.
+            Because this library is stateless, the server has to be
+            responsible for storing this MAC if desired (recommended).
+            It would need to be stored and returned with each repeated
+            query in the same client session. If present, the validity
+            check will verify that the MAC is valid. It is keyed by
+            the master key passed at object instantiation. Unless that
+            key is relatively stable, this check may not be useful.
     """
 
     supported_versions = ['1']
@@ -42,56 +90,6 @@ class Request(object):
     supported_opts = ['sqrlonly', 'hardlock', 'cps', 'suk']
 
     def __init__(self, key, params, **kwargs):
-        """Constructor
-
-        Note:
-            Errors in the \**kwargs will result in a thrown
-            ValueError. Any other errors that arise not from client
-            input also result in thrown errors. All client-related
-            errors are communicated through the Response object.
-        
-        Args:
-            key (bytes) : 32-byte encryption key. Must be the same as
-                what you used to encrypt the nut.
-
-            params (dict) : All the query parameters from the query string
-                and POST body.The following parameters must exist:
-
-                - nut
-                - server
-                - client
-                - idk
-                - ids
-
-                Depending on the content of these, additional parameters
-                may also be needed. Missing or malformed parameters will
-                result in an error response.
-
-        Keyword Args:
-            ipaddr (string) : String representation of the valid IPv4
-                or IPv6 address the request came from. Defaults to
-                '0.0.0.0'.
-            ttl (uint) : Required. The maximum acceptable age in
-                seconds of the submitted nut. Defaults to 600 (10
-                minutes).
-            maxcounter (uint) : The maximum acceptable counter value
-                in the submitted nut. Defaults to None, which disables
-                upper-limit checking of the counter.
-            mincounter (uint) : The minimum acceptable counter value
-                in the submitted nut. Defaults to None, which disables
-                lower-limit checking of the counter.
-            secure (bool) : Whether the request was received via SSL.
-                Defaults to True.
-            hmac (string) : The response object emits a keyed MAC.
-                Because this library is stateless, the server has to be
-                responsible for storing this MAC if desired (recommended).
-                It would need to be stored and returned with each repeated
-                query in the same client session. If present, the validity
-                check will verify that the MAC is valid. It is keyed by
-                the master key passed at object instantiation. Unless that
-                key is relatively stable, this check may not be useful.
-        """
-
         self.ipaddr = ipaddress.ip_address('0.0.0.0')
         if 'ipaddr' in kwargs:
             try:
@@ -186,22 +184,22 @@ class Request(object):
                       Session"
 
                 The subsequent call to ``handle`` expects the following dictionary:
-                    'authenticated' : (required) boolean
+                    authenticated : (required) boolean
                         If present and True, the handler will signal 
                         success to the client.
                         If present and False, the handler will signal 
                         an error.
                         If not provided, the handler will throw an exception.
-                    'url' : (optional) string
+                    url : (optional) string
                         If 'cps' was set, and the server supports it, 
                         it can pass a path to a pre-authenticated endpoint 
                         here (path only).
-                    'disabled' : (optional) ANY
+                    disabled : (optional) ANY
                         The presence of this key (regardless of value) means 
                         the primary identity is recognized but that the user 
                         disabled it. It cannot be used for authentication 
                         until reenabled or rekeyed.
-                    'suk' : (dependent) string
+                    suk : (dependent) string
                         If the account is disabled, then you must provide 
                         the Server Unlock Key. Failure to do so will raise 
                         an exception.
@@ -231,10 +229,11 @@ class Request(object):
                         - ``counter``: the counter did not pass requested sanity checks
 
                 The subsequent call to ``handle`` expects the following dictionary:
-                    'confirmed' (bool) : If present and True, the
-                        handler will process the request. In all other
-                        cases, the handler will set the appropriate error
-                        codes and terminate.
+                    confirmed : boolean
+                        If present and True, the handler will process
+                        the request. In all other cases, the handler
+                        will set the appropriate error codes and
+                        terminate.
 
             *disable*
 
@@ -244,16 +243,16 @@ class Request(object):
                     - String (required) representing the SQRL identity
 
                 The subsequent call to ``handle`` expects the following dictionary:
-                    'deactivated' : (required) boolean
+                    deactivated : (required) boolean
                         If present and True, the server is saying they have complied.
                         If present and False, the user will be notified that the command was
                         not completed. 
                         If not present, an exception will be thrown.
                         True implies 'found' is also True.
-                    'suk' : (dependent) string
+                    suk : (dependent) string
                         If 'deactivated' is True , you must provide the Server 
                         Unlock Key. Failure to do so will raise an exception.
-                    'found' : (optional, recommended) boolean
+                    found : (optional, recommended) boolean
                         Only useful if 'deactivated' is False.
                         If present, signals whether the server recognizes this user.
 
@@ -262,13 +261,13 @@ class Request(object):
                 Tells the server to enable the given account. 
 
                 Contains the following additional element:
-                    'activated' : (required) boolean
+                    activated : (required) boolean
                         If present and True, the server is saying they have complied.
                         If present and False, the user will be notified 
                         that the command was not completed.
                         If not present, an exception will be thrown.
                         True implies 'found' is also True.
-                    'found' : (optional, recommended) boolean
+                    found : (optional, recommended) boolean
                         Only useful if 'activated' is False.
                         If present, signals whether the server recognizes this user.
 
@@ -290,17 +289,17 @@ class Request(object):
                       all keys.
 
                 The subsequent call to ``handle`` expects the following dictionary:
-                    'found' : (required) array of booleans
+                    found : (required) array of booleans
                         True indicates that the key is recognized.
                         False indicates that the key is not recognized.
                         The order should be the same as provided in
                         the ``action`` property.
-                    'disabled' : (optional) ANY
+                    disabled : (optional) ANY
                         The presence of this key (regardless of value)
                         means the primary identity is recognized but
                         that the user disabled it. It cannot be used
                         for authentication until reenabled or rekeyed.
-                    'suk' : (dependent) string
+                    suk : (dependent) string
                         If the account is disabled, then you must
                         provide the Server Unlock Key. Failure to do
                         so will raise an exception.
@@ -315,7 +314,7 @@ class Request(object):
                       should be turned on or off.
 
                 The subsequent call to ``handle`` expects the following dictionary:
-                    'hardlock': (optional) boolean
+                    hardlock: (optional) boolean
                         If present and False, the handler will hard fail. 
                         It will set codes 0x10 and 0x40 and abort.
                         In all other cases, the code will simply assume the 
@@ -344,13 +343,13 @@ class Request(object):
                 Tells the server to remove the given account. 
 
                 Contains the following additional element:
-                    'removed' : (required) boolean
+                    removed : (required) boolean
                         If present and True, the server is saying they have complied.
                         If present and False, the user will be notified 
                         that the command was not completed.
                         If not present, an exception will be thrown.
                         True implies 'found' is also True.
-                    'found' : (optional, recommended) boolean
+                    found : (optional, recommended) boolean
                         Only useful if 'removed' is False.
                         If present, signals whether the server recognizes this user.
 
@@ -364,7 +363,7 @@ class Request(object):
                       be turned on or off.
 
                 The subsequent call to ``handle`` expects the following dictionary:
-                    'sqrlonly': (optional) boolean
+                    sqrlonly : (optional) boolean
                         If present and False, the handler will hard fail. 
                         It will set codes 0x10 and 0x40 and abort.
                         In all other cases, the code will simply assume 
@@ -377,7 +376,7 @@ class Request(object):
                 This action contains no additional elements.
 
                 The subsequent call to ``handle`` expects the following dictionary:
-                    'suk': (optional) string
+                    suk : (optional) string
                         If the server knows this user, it must return the 
                         Server Unlock Key.
 
@@ -389,7 +388,7 @@ class Request(object):
                 This action contains no additional elements.
 
                 The subsequent call to ``handle`` expects the following dictionary:
-                    'vuk' : (required) string or None
+                    vuk : (required) string or None
                         If None, then the server is asserting it doesn't
                         have the VUK. A client error will be flagged.
                         Will raise an exception if 'vuk' is not present.
@@ -419,7 +418,7 @@ class Request(object):
 
                 Injects a cancellation URL into any response.
 
-                The value of 'can' must be a valid URL path, with parameters,
+                The value must be a valid URL path, with parameters,
                 if desired.
 
             *sin*
@@ -429,7 +428,7 @@ class Request(object):
                 reply with a 'query' containing the INS and possibly PINS
                 encrypted values.
 
-                The value of 'sin' must be a string.
+                The value must be a string.
         """
 
         #First check if we're in an ``ACTION`` state and process given data
@@ -684,13 +683,84 @@ class Request(object):
         if 'suk' in opts:
             self.action.append(('suk',))
 
-    def response(self):
+    def finalize(self, **kwargs):
         """Finalizes and returns the internal Response object.
 
-        Parameters
-        ----------
+        This function has no side effects. It can be called multiple
+        times without issue.
+
+        Keyword Args:
+            counter (uint) : 32-byte integer to encode as the 
+                counter value in the new nut. Must be provided if you 
+                want the object to generate the nut for you.
+            ipaddr (string) : The IPv4 or IPv6 address you want encoded
+                into the new nut. If not provided, it will use the ipaddress
+                saved in the Request object.
+            nut (Nut) : A pre-generated nut. If provided, this nut will
+                be injected into the response. Otherwise a new nut will
+                be generated and injected for you.
+            params (dict) : A dictionary of name-value pairs that will be
+                sent to the client, and that the client is supposed to
+                return untouched. You can also encode these values into
+                the ``qry``.
+            qry (string) : The URL the client should respond to. If
+                not provided,the last value sent will be used. This is a
+                good place to also encode any state information you want
+                the client to return to you (though see ``params`` below).
+                The scheme and netloc parts will be stripped, if given.
+                The nut (whether autogenerated or provided) will be
+                inserted into ``qry`` for you.
+            timestamp (uint) : Unix timestamp (seconds only) to be encoded
+                into the new nut. If omitted, it will use the current 
+                system time.
+
+        Returns:
+            Response : the finalized response object.
         """
-        pass
+        
+        #choose a nut
+        nut = None
+        if 'nut' in kwargs:
+            assert isinstance(kwargs['nut'], Nut)
+            nut = kwargs['nut']
+        else:
+            assert 'counter' in kwargs
+            nut = Nut(self.key)
+            ipaddr = self.ipaddr
+            if 'ipaddr' in kwargs:
+                ipaddr = kwargs['ipaddr']
+            timestamp = None
+            if 'timestamp' in kwargs:
+                timestamp = kwargs['timestamp']
+            nut.generate(ipaddr, kwargs['counter'], timestamp=timestamp)
+        assert nut is not None
+        oldnut = Nut(self.key)
+        oldnut.load(self.params['nut'])
+        nutstr = nut.toString('qr')
+        if oldnut.islink:
+            nutstr = nut.toString('link')
+
+        #finalize qry
+        qry = None
+        if 'qry' in kwargs:
+            qry = kwargs['qry']
+        else:
+            if isinstance(self.params['server'], dict):
+                qry = self.params['server']['qry']
+            else:
+                qry = self.params['server']
+        assert qry is not None
+        qry = stripurl(addquery(qry, {'nut': nutstr}))
+
+        #get a copy of the current response
+        r = Response.load(self._response)
+
+        #add to response object
+        r.addParam('nut', nutstr)
+        r.addParam('qry', qry)
+
+        #return response object
+        return r
 
     def _check_well_formedness(self):
         """Performs basic well-formedness checks.
