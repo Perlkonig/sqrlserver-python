@@ -1,4 +1,4 @@
-from .utils import pad, depad
+from .utils import pad, depad, stripurl
 from .response import Response
 from .nut import Nut
 import ipaddress
@@ -169,60 +169,6 @@ class Request(object):
             call ``handle`` again with any requested information
             passed in a single dictionary.
 
-            *confirm*
-
-                Means there is an issue with the nut. The server must
-                confirm whether they wish to proceed. It's important
-                to let the server decide because (a) it might be
-                expected that the IPs don't match (cross-device login)
-                and (b) the "counter" part of the nut could be used to
-                store other types of information instead.
-
-                Contains the following additional element:
-                    - Array of strings representing possible issues:
-                        - ``ip``: the ip addresses didn't match
-                        - ``time``: the nut is older than the specified ttl
-                        - ``counter``: the counter did not pass requested sanity checks
-
-                The subsequent call to ``handle`` expects the following dictionary:
-                    'confirmed' (bool) : If present and True, the
-                        handler will process the request. In all other
-                        cases, the handler will set the appropriate error
-                        codes and terminate.
-
-            *find*
-
-                Asks the server to locate the given keys in their user database.
-
-                Contains the following additional element:
-
-                    - Array of strings representing SQRL identities.
-                      This array will always at least contain the
-                      primary identity. If a previous identities were
-                      given by the client, they will also appear in
-                      the list. The spec currently limits the number
-                      of previous identities to one at a time (meaning
-                      this array should never be longer than two
-                      elements), but there's no reason to enforce that
-                      at this level. The server should simply check
-                      all keys.
-
-                The subsequent call to ``handle`` expects the following dictionary:
-                    'found' : (required) array of booleans
-                        True indicates that the key is recognized.
-                        False indicates that the key is not recognized.
-                        The order should be the same as provided in
-                        the ``action`` property.
-                    'disabled' : (optional) ANY
-                        The presence of this key (regardless of value)
-                        means the primary identity is recognized but
-                        that the user disabled it. It cannot be used
-                        for authentication until reenabled or rekeyed.
-                    'suk' : (dependent) string
-                        If the account is disabled, then you must
-                        provide the Server Unlock Key. Failure to do
-                        so will raise an exception.
-            
             *auth*
 
                 Asks the server to officially authenticate the given user. 
@@ -260,48 +206,35 @@ class Request(object):
                         the Server Unlock Key. Failure to do so will raise 
                         an exception.
 
-            *sqrlonly*
+            *btn*
 
-                Tells the server whether to enable or disable 'sqrlonly' 
-                on the server side. 
-
-                Contains the following additional element:
-                    - Boolean (required) signalling whether the option should 
-                      be turned on or off.
-
-                The subsequent call to ``handle`` expects the following dictionary:
-                    'sqrlonly': (optional) boolean
-                        If present and False, the handler will hard fail. 
-                        It will set codes 0x10 and 0x40 and abort.
-                        In all other cases, the code will simply assume 
-                        the server has complied.
-
-            *hardlock*
-
-                Tells the server whether to enable or disable 'hardlock' on 
-                the server side.
+                Means the request was accompanied by a 'btn' parameter.
 
                 Contains the following additional element:
-                    - Boolean (required) signalling whether the option 
-                      should be turned on or off.
+                    - String : One of '1', '2', or '3'
+
+                This action has no requirements for subsequent calls to ``handle``.
+
+            *confirm*
+
+                Means there is an issue with the nut. The server must
+                confirm whether they wish to proceed. It's important
+                to let the server decide because (a) it might be
+                expected that the IPs don't match (cross-device login)
+                and (b) the "counter" part of the nut could be used to
+                store other types of information instead.
+
+                Contains the following additional element:
+                    - Array of strings representing possible issues:
+                        - ``ip``: the ip addresses didn't match
+                        - ``time``: the nut is older than the specified ttl
+                        - ``counter``: the counter did not pass requested sanity checks
 
                 The subsequent call to ``handle`` expects the following dictionary:
-                    'hardlock': (optional) boolean
-                        If present and False, the handler will hard fail. 
-                        It will set codes 0x10 and 0x40 and abort.
-                        In all other cases, the code will simply assume the 
-                        server has complied.
-
-            *suk*
-
-                Tells the server to send the stored Server Unlock Key.
-
-                This action contains no additional elements.
-
-                The subsequent call to ``handle`` expects the following dictionary:
-                    'suk': (optional) string
-                        If the server knows this user, it must return the 
-                        Server Unlock Key.
+                    'confirmed' (bool) : If present and True, the
+                        handler will process the request. In all other
+                        cases, the handler will set the appropriate error
+                        codes and terminate.
 
             *disable*
 
@@ -324,19 +257,6 @@ class Request(object):
                         Only useful if 'deactivated' is False.
                         If present, signals whether the server recognizes this user.
 
-            *vuk*
-
-                Tells the server to send the Verify Unlock Key. This is needed
-                for account recovery functions like 'enable' and 'remove'.
-
-                This action contains no additional elements.
-
-                The subsequent call to ``handle`` expects the following dictionary:
-                    'vuk' : (required) string or None
-                        If None, then the server is asserting it doesn't
-                        have the VUK. A client error will be flagged.
-                        Will raise an exception if the key doesen't exist at all.
-
             *enable*
 
                 Tells the server to enable the given account. 
@@ -352,6 +272,73 @@ class Request(object):
                         Only useful if 'activated' is False.
                         If present, signals whether the server recognizes this user.
 
+            *find*
+
+                Asks the server to locate the given keys in their user database.
+
+                Contains the following additional element:
+
+                    - Array of strings representing SQRL identities.
+                      This array will always at least contain the
+                      primary identity. If a previous identities were
+                      given by the client, they will also appear in
+                      the list. The spec currently limits the number
+                      of previous identities to one at a time (meaning
+                      this array should never be longer than two
+                      elements), but there's no reason to enforce that
+                      at this level. The server should simply check
+                      all keys.
+
+                The subsequent call to ``handle`` expects the following dictionary:
+                    'found' : (required) array of booleans
+                        True indicates that the key is recognized.
+                        False indicates that the key is not recognized.
+                        The order should be the same as provided in
+                        the ``action`` property.
+                    'disabled' : (optional) ANY
+                        The presence of this key (regardless of value)
+                        means the primary identity is recognized but
+                        that the user disabled it. It cannot be used
+                        for authentication until reenabled or rekeyed.
+                    'suk' : (dependent) string
+                        If the account is disabled, then you must
+                        provide the Server Unlock Key. Failure to do
+                        so will raise an exception.
+            
+            *hardlock*
+
+                Tells the server whether to enable or disable 'hardlock' on 
+                the server side.
+
+                Contains the following additional element:
+                    - Boolean (required) signalling whether the option 
+                      should be turned on or off.
+
+                The subsequent call to ``handle`` expects the following dictionary:
+                    'hardlock': (optional) boolean
+                        If present and False, the handler will hard fail. 
+                        It will set codes 0x10 and 0x40 and abort.
+                        In all other cases, the code will simply assume the 
+                        server has complied.
+
+            *ins*
+
+                Means the request was accompanied by a 'ins' parameter.
+
+                Contains the following additional element:
+                    - String : The value of the 'ins' parameter
+
+                This action has no requirements for subsequent calls to ``handle``.
+
+            *pins*
+
+                Means the request was accompanied by a 'pins' parameter.
+
+                Contains the following additional element:
+                    - String : The value of the 'ins' parameter
+
+                This action has no requirements for subsequent calls to ``handle``.
+
             *remove*
 
                 Tells the server to remove the given account. 
@@ -366,6 +353,83 @@ class Request(object):
                     'found' : (optional, recommended) boolean
                         Only useful if 'removed' is False.
                         If present, signals whether the server recognizes this user.
+
+            *sqrlonly*
+
+                Tells the server whether to enable or disable 'sqrlonly' 
+                on the server side. 
+
+                Contains the following additional element:
+                    - Boolean (required) signalling whether the option should 
+                      be turned on or off.
+
+                The subsequent call to ``handle`` expects the following dictionary:
+                    'sqrlonly': (optional) boolean
+                        If present and False, the handler will hard fail. 
+                        It will set codes 0x10 and 0x40 and abort.
+                        In all other cases, the code will simply assume 
+                        the server has complied.
+
+            *suk*
+
+                Tells the server to send the stored Server Unlock Key.
+
+                This action contains no additional elements.
+
+                The subsequent call to ``handle`` expects the following dictionary:
+                    'suk': (optional) string
+                        If the server knows this user, it must return the 
+                        Server Unlock Key.
+
+            *vuk*
+
+                Tells the server to send the Verify Unlock Key. This is needed
+                for account recovery functions like 'enable' and 'remove'.
+
+                This action contains no additional elements.
+
+                The subsequent call to ``handle`` expects the following dictionary:
+                    'vuk' : (required) string or None
+                        If None, then the server is asserting it doesn't
+                        have the VUK. A client error will be flagged.
+                        Will raise an exception if 'vuk' is not present.
+
+            Additionally, the server can proactively request information
+            from the client. The spec currently supports two such features,
+            triggered by adding the following to the ``args`` variable
+            when calling the handler.
+
+            *ask*
+
+                Aborts the current command (TIF 0x40) and sends a message
+                to the client. If the client sends a response, it will 
+                made available via the 'btn' action.
+
+                The value of 'ask' must be a dictionary containing at least
+                the key ``msg`` (string), containing the message to be sent.
+                It may also contain the key ``buttons``, which, if present,
+                must consist of a tuple of one or two other tuples, each
+                representing a button. The first element must be the text
+                for the button. A second element, if present, will be 
+                interpreted as a URL to associate with the button. The library 
+                will inject a well-formed 'ask' parameter into the
+                finalized response.
+
+            *can*
+
+                Injects a cancellation URL into any response.
+
+                The value of 'can' must be a valid URL path, with parameters,
+                if desired.
+
+            *sin*
+
+                Completes the requested command but also sends a value to
+                the client to be encrypted. The client would then hopefully
+                reply with a 'query' containing the INS and possibly PINS
+                encrypted values.
+
+                The value of 'sin' must be a string.
         """
 
         #First check if we're in an ``ACTION`` state and process given data
@@ -480,6 +544,31 @@ class Request(object):
                 else:
                     raise ValueError('Unrecognized action ({}). This should never happen!'.format(action[0]))
             self.action = []
+
+        #Check for params not tied to specific actions and handle.
+        #Includes 'sin' (with 'ins' and 'pins') and 'ask' (with 'btn')
+        if 'sin' in args:
+            self._response.addParam('sin', args['sin'])
+        if 'can' in args:
+            self._response.addParam('can', stripurl(args['can']))
+        if 'ask' in args:
+            if 'msg' not in args['ask']:
+                raise ValueError("The server requested an ASK without specifying a message.")
+            msg = depad(urlsafe_b64encode(args['ask']['msg'].encode('utf-8')).decode('utf-8'))
+            if 'buttons' in args['ask']:
+                for btn in args['ask']['buttons']:
+                    if ';' in btn[0]:
+                        raise ValueError("Semicolons may not be used in button labels.")
+                    txt = depad(urlsafe_b64encode(btn[0].encode('utf-8')).decode('utf-8'))
+                    if len(btn) == 2:
+                        txt += ';' + stripurl(btn[1])
+                    msg += '~' + txt
+            self._response.addParam('ask', msg)
+            self._response.tifOn(0x40)
+            self.state = 'COMPLETE'
+        for param in ['btn', 'ins', 'pins']:
+            if param in self.params['client']:
+                self.action.append((param, self.params['client'][param]))
 
         #Loop until we need additional information or are finished.
         #TODO: Need to prove there's no chance of an infinite loop, or rewrite.

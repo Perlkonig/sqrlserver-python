@@ -656,5 +656,58 @@ def test_cmd_remove():
     assert req._response._tif & 0x40
     assert req._response._tif & 0x80
 
+def test_action_canasksin():
+    key = nacl.utils.random(32)
+    nut = sqrlserver.Nut(key)
+    nutstr = nut.generate('1.2.3.4', 100, timestamp=time.time()-100).toString('qr')
+    params = {
+        'nut': nutstr,
+        'sfn': 'R1JD',
+        'can': 'aHR0cHM6Ly93d3cuZ3JjLmNvbS9zcXJsL2RpYWcuaHRt',
+        'client': 'dmVyPTENCmNtZD1xdWVyeQ0KaWRrPVRMcHlyb3dMaFdmOS1oZExMUFFPQS03LXhwbEk5TE94c2ZMWHN5VGNjVmMNCm9wdD1jcHN-c3VrDQo',
+        'server': 'c3FybDovL3d3dy5ncmMuY29tL3Nxcmw_bnV0PVpIUVNuYllXU0REVWo1NzBtc0l1VlEmc2ZuPVIxSkQmY2FuPWFIUjBjSE02THk5M2QzY3VaM0pqTG1OdmJTOXpjWEpzTDJScFlXY3VhSFJ0',
+        'ids': 'tCTr1DoEYANtxGE_        kRNHgSsHa87aRG9C0vNqy7h6CaV8tH5TnBJmdW0gbDsja1JsRbSNA4ZeFVUIfOnzdEz8DA'
+    }
 
+    #TODO: Need coverage for previous identities
+
+    #Injection of can and sin
+    req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
+    req.handle({'sin': 'index', 'can': 'https://example.com:8080/sqrl?a=b&c=d'})
+    assert req.state == 'ACTION'
+    assert req._response.params['sin'] == 'index'
+    assert req._response.params['can'] == '/sqrl?a=b&c=d'
+
+    #TODO: Need reference hashes for returned BTN, INS, and PINS
+
+    #Injection asks
+    ask1 = {'msg': 'Simple question'}
+    ask2 = {'msg': 'One button', 'buttons': (('Button 1',),)}
+    ask3 = {'msg': 'One button', 'buttons': (('Button 1; fail',),)}
+    ask4 = {'msg': 'Two buttons', 'buttons': (('Button 1',), ('Button 2',))}
+    ask5 = {'msg': 'Two buttons w/ URLs', 'buttons': (('Button 1', '/url1'), ('Button 2', 'https://www.example.com:8080/url2#frag'))}
+
+    req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
+    req.handle({'ask': ask1})
+    assert req._response.params['ask'] == 'U2ltcGxlIHF1ZXN0aW9u'
+    assert req._response._tif & 0x40
+
+    req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
+    req.handle({'ask': ask2})
+    assert req._response.params['ask'] == 'T25lIGJ1dHRvbg~QnV0dG9uIDE'
+    assert req._response._tif & 0x40
+
+    with pytest.raises(ValueError):
+        req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
+        req.handle({'ask': ask3})
+
+    req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
+    req.handle({'ask': ask4})
+    assert req._response.params['ask'] == 'VHdvIGJ1dHRvbnM~QnV0dG9uIDE~QnV0dG9uIDI'
+    assert req._response._tif & 0x40
+
+    req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
+    req.handle({'ask': ask5})
+    assert req._response.params['ask'] == 'VHdvIGJ1dHRvbnMgdy8gVVJMcw~QnV0dG9uIDE;/url1~QnV0dG9uIDI;/url2#frag'
+    assert req._response._tif & 0x40
 
