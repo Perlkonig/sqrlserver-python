@@ -1,29 +1,28 @@
 SQRL Server Library
-=======================
+===================
 
-ALPHA STATE! CODE MAY NOT BUILD, LET ALONE WORK AS EXPECTED!
+This module supports Python-based web servers in processing `SQRL <https://www.grc.com/sqrl/sqrl.htm>`_ requests. It only does the core protocol work. It leaves data representation, storage, and other platform-specific actions to the server.
 
-This module supports Python-based web servers in processing SQRL_ requests. It only does the core protocol work. It leaves data representation, storage, and other platform-specific actions to the server.
+Usage
+-----
 
-.. _SQRL: https://www.grc.com/sqrl/sqrl.htm
+Visit our `ReadTheDocs.io page <LINK>`_ for the full documentation.
 
-Currently Implemented
----------------------
+Installation
+------------
 
-- ``url_generate``: Generates the URL that directs the SQRL client where to authenticate.
+Eventually it will be available via PyPi:
 
-- ``Nut`` class: Used for generating, inspecting, and validating nuts.
+    pip install sqrlserver
 
-- ``Request`` class: Used for receiving and processing client requests. Currently supports the following commands:
-  
-  - ``query``
-	
-- ``Response`` class: Used by the ``Request`` class to build the response you will need to return to the client.
+Contribute
+----------
 
-Divergences
------------
+- Issue Tracker: github.com/Perlkonig/sqrlserver-python/issues
+- Source Code: github.com/Perlkonig/sqrlserver-python
 
-- Status code 0x100 is not currently used. If IDs ever get rolled into the nut, then this could change.
+License
+-------
 
-- The spec is unclear about how to handle unsupported options. For now, the library leaves it up to the server to decide whether to hard or soft fail an option request. Hard fail will result in setting TIF codes 0x10 and 0x80 and aborting any requested actions. A soft fail will result in the command being successfully concluded without any notice to the user, unless the server chooses to use the ASK feature.
+The project is licensed under the MIT licence.
 

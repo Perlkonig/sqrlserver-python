@@ -86,6 +86,7 @@ setup(
     install_requires=[
         'bitstring', 
         'pynacl',
+        'ipaddress'
     ],
 
     # List additional groups of dependencies here (e.g. development
