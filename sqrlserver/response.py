@@ -15,8 +15,8 @@ class Response:
         params (dict) : The name-value pairs currently set.
     """
 
-    bits = [0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x100]
-    supportedvers = '1'
+    _bits = [0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x100]
+    _supportedvers = '1'
 
     def __init__(self, ver=1):
         self.ver = ver
@@ -68,7 +68,7 @@ class Response:
         """Converts to b64u encoded string"""
 
         p = dict(self.params)
-        p['ver'] = self.ver
+        p['ver'] = self._supportedvers
         p['tif'] = self.tif
         return depad(urlsafe_b64encode(Response._compose(p).encode('utf-8')).decode('utf-8'))
 
@@ -81,16 +81,16 @@ class Response:
         """Turns on given status bits, if not already on."""
 
         for bit in args:
-            if bit in self.bits:
+            if bit in self._bits:
                 if self._tif & bit == 0:
                     self._tif += bit
         return self
         
     def tifOff(self, *args):
-        """Turns off a given status bit, if not already off."""
+        """Turns off the given status bits, if not already off."""
 
         for bit in args:
-            if bit in self.bits:
+            if bit in self._bits:
                 if self._tif & bit != 0:
                     self._tif -= bit
         return self

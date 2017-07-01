@@ -12,15 +12,14 @@ from .utils import pad, depad
 class Nut(object):
     """A class encompassing SQRL nuts.
 
-    Expected workflow is as follows:
-        - Construct nut with key 
-        - If generating:
-            - generate
-            - toString
-        - If validating/querying:
-            - load
-            - validate
-            - inspect
+    The server should not need to use this class directly, but of course
+    it may. It is designed to work as follows:
+
+    - Construct the object with the 32-byte key.
+    - If generating a new nut, use :py:meth:`.generate` followed by 
+      :py:meth:`.toString`.
+    - If validating an existing nut, use :py:meth:`.load`, then :py:meth:`.validate`,
+      then look at the various attributes to determine if any errors were found.
 
     Attributes:
         key (bytes) : 32 bytes used to encrypt the nut. 
@@ -39,6 +38,8 @@ class Nut(object):
         Args:
             key (bytes) : 32-byte key used to encrypt/decrypt the nut
         """
+
+        assert len(key) == 32
 
         self.nuts = {'raw': None, 'qr': None, 'link': None}
         self.key = key

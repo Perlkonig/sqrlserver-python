@@ -3,25 +3,56 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Welcome to SQRL Server's documentation!
-================================================
-
-Contents:
+#######################################
+SQRL Server
+#######################################
 
 .. toctree::
    :maxdepth: 2
+   :hidden:
 
-   modules
+   usage
+   divergences
+   API <modules>
 
-Usage
------
+This module supports Python-based web servers in processing `SQRL <https://www.grc.com/sqrl/sqrl.htm>`_ requests. It only does the core protocol work. It leaves data representation, storage, and other platform-specific actions to the server.
 
-Divergences
------------
+The following terms are used throughout the documentation:
 
-- Status code 0x100 is not currently used. If IDs ever get rolled into the nut, then this could change.
+user
+    The human actor interacting with the system
 
-- The spec is unclear about how to handle unsupported options. For now, the library leaves it up to the server to decide whether to hard or soft fail an option request. Hard fail will result in setting TIF codes 0x10 and 0x80 and aborting any requested actions. A soft fail will result in the command being successfully concluded without any notice to the user, unless the server chooses to use the ASK feature.
+client
+    The client software the user is using to interact
+
+server
+    The web service that is wanting to support SQRL interaction
+
+library
+    This code that supports the server in understanding SQRL interactions
+
+Installation
+============
+
+Eventually it will be available via PyPi::
+
+    pip install sqrlserver
+
+For now, download and install manually::
+
+    python setup.py test
+    python setup.py install
+
+Contribute
+==========
+
+- Issue Tracker: <https://github.com/Perlkonig/sqrlserver-python/issues>
+- Source Code: <https://github.com/Perlkonig/sqrlserver-python>
+
+Licence
+=======
+
+The project is licensed under the MIT licence.
 
 
 Indices and tables

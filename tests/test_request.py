@@ -690,12 +690,12 @@ def test_action_canasksin():
     req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
     req.handle({'ask': ask1})
     assert req._response.params['ask'] == 'U2ltcGxlIHF1ZXN0aW9u'
-    assert req._response._tif & 0x40
+    assert not req._response._tif & 0x40
 
     req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
     req.handle({'ask': ask2})
     assert req._response.params['ask'] == 'T25lIGJ1dHRvbg~QnV0dG9uIDE'
-    assert req._response._tif & 0x40
+    assert not req._response._tif & 0x40
 
     with pytest.raises(ValueError):
         req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
@@ -704,12 +704,12 @@ def test_action_canasksin():
     req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
     req.handle({'ask': ask4})
     assert req._response.params['ask'] == 'VHdvIGJ1dHRvbnM~QnV0dG9uIDE~QnV0dG9uIDI'
-    assert req._response._tif & 0x40
+    assert not req._response._tif & 0x40
 
     req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
     req.handle({'ask': ask5})
     assert req._response.params['ask'] == 'VHdvIGJ1dHRvbnMgdy8gVVJMcw~QnV0dG9uIDE;/url1~QnV0dG9uIDI;/url2#frag'
-    assert req._response._tif & 0x40
+    assert not req._response._tif & 0x40
 
 def test_finalize():
     key = nacl.utils.random(32)

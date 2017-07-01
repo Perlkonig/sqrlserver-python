@@ -23,8 +23,8 @@ For now, download and install manually::
 Contribute
 ----------
 
-- Issue Tracker: <github.com/Perlkonig/sqrlserver-python/issues>
-- Source Code: <github.com/Perlkonig/sqrlserver-python>
+- Issue Tracker: <https://github.com/Perlkonig/sqrlserver-python/issues>
+- Source Code: <https://github.com/Perlkonig/sqrlserver-python>
 
 License
 -------

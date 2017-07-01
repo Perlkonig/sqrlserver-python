@@ -9,6 +9,7 @@ Submodules
    sqrlserver.nut
    sqrlserver.request
    sqrlserver.response
+   sqrlserver.url
    sqrlserver.utils
 
 Module contents
