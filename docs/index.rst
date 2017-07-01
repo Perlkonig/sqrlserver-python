@@ -12,10 +12,11 @@ SQRL Server
    :hidden:
 
    usage
+   examples
    divergences
    API <modules>
 
-This module supports Python-based web servers in processing `SQRL <https://www.grc.com/sqrl/sqrl.htm>`_ requests. It only does the core protocol work. It leaves data representation, storage, and other platform-specific actions to the server.
+This module supports Python-based web servers in processing `SQRL <https://www.grc.com/sqrl/sqrl.htm>`_ requests. It only does the core protocol work (signature validation, etc.). It leaves data representation, storage, and other platform-specific actions to the server.
 
 The following terms are used throughout the documentation:
 
@@ -43,6 +44,14 @@ For now, download and install manually::
     python setup.py test
     python setup.py install
 
+Requirements
+============
+
+This library only works with Python3. It requires the following external libraries to run:
+
+- bitstring
+- PyNaCl
+
 Contribute
 ==========
 
@@ -54,6 +63,11 @@ Licence
 
 The project is licensed under the MIT licence.
 
+Changelog
+=========
+
+01 Jul 2017
+  * Initial release (v0.1.0)
 
 Indices and tables
 ==================

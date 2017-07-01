@@ -9,8 +9,7 @@ The core workflow is quite simple:
 #. Create a :py:class:`.Url` to generate the URLs that point clients to your SQRL endpoints.
 #. Create a :py:class:`.Request` object when a POST is made to those endpoints.
 #. Call the request's :py:meth:`.Request.handle` method repeatedly until its ``state`` is ``COMPLETE``.
-#. Call :py:meth:`.Request.finalize` to get a :py:class:`.Response` object.
-#. Return :py:meth:`.Response.toString` to the client.
+#. Call :py:meth:`.Request.finalize` to get a :py:class:`.Response` object and then return :py:meth:`.Response.toString` to the client.
 
 Step 1: Generate a URL
 ----------------------
@@ -353,17 +352,14 @@ encrypted values.
 
 The value must be a string.
 
-Step 4: Finalize the Request
-----------------------------
+Step 4: Finalize & Return the Response
+--------------------------------------
 
 The :py:meth:`.Request.finalize` method does the final steps to prepare the :py:class:`.Response`. You must pass it either a :py:class:`.Nut` you manually generated or the data needed to autogenerate a new one for you. It also finalizes the URL you want the client to respond to with its next request.
 
 This method does not affect the :py:class:`.Request` object in any way. You can safely call this method multiple times with different parameters.
 
-it will return to you a valid :py:class:`.Response` object.
-
-Step 5: Return the Response
----------------------------
+It will return to you a valid :py:class:`.Response` object.
 
 At this point it's a simple matter of calling :py:meth:`.Response.toString` and returning that in the body of your response to the client's POST.
 
