@@ -6,20 +6,25 @@ This module supports Python-based web servers in processing `SQRL <https://www.g
 Usage
 -----
 
-Visit our `ReadTheDocs.io page <LINK>`_ for the full documentation.
+Visit our `ReadTheDocs.io page <https://sqrl-server-python.readthedocs.io>`_ for the full documentation.
 
 Installation
 ------------
 
-Eventually it will be available via PyPi:
+Eventually it will be available via PyPi::
 
     pip install sqrlserver
+
+For now, download and install manually::
+
+    python setup.py test
+    python setup.py install
 
 Contribute
 ----------
 
-- Issue Tracker: github.com/Perlkonig/sqrlserver-python/issues
-- Source Code: github.com/Perlkonig/sqrlserver-python
+- Issue Tracker: <github.com/Perlkonig/sqrlserver-python/issues>
+- Source Code: <github.com/Perlkonig/sqrlserver-python>
 
 License
 -------
