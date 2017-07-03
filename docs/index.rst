@@ -66,6 +66,11 @@ The project is licensed under the MIT licence.
 Changelog
 =========
 
+03 Jul 2017
+  * Released v0.2.0
+  * Added SFN check; SFN is now required with every request
+  * Tests and docs updated
+
 01 Jul 2017
   * Initial release (v0.1.0)
 

@@ -31,7 +31,3 @@ License
 
 The project is licensed under the MIT licence.
 
-Todo
-----
-
-- Add SFN checker

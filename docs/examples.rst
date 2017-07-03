@@ -17,7 +17,7 @@ Step 1: Generate a URL::
 
 Step 2: Receive a Request::
 
-    req = Request(key, postparams) #let's assume a basic ``query`` command
+    req = Request(key, 'Example Site', postparams) #let's assume a basic ``query`` command
     assert req.state == 'NEW'
 
 Step 3: Handle the Request::
