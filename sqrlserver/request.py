@@ -43,9 +43,6 @@ class Request(object):
     Args:
         key (bytes) : 32-byte encryption key. Must be the same as
             what you used to encrypt the nut.
-        sfn (string) : Advertised Server Friendly Name. If sfn is passed
-            in ``params`` and doesn't match what you pass, the request
-            will be aborted.
 
         params (dict) : All the query parameters from the query string
             and POST body. 
@@ -53,7 +50,6 @@ class Request(object):
             The following parameters must exist:
 
             - nut
-            - sfn
             - server
             - client
             - ids
@@ -93,7 +89,7 @@ class Request(object):
     _known_opts = ['sqrlonly', 'hardlock', 'cps', 'suk']
     _supported_opts = ['sqrlonly', 'hardlock', 'cps', 'suk']
 
-    def __init__(self, key, sfn, params, **kwargs):
+    def __init__(self, key, params, **kwargs):
         self.ipaddr = ipaddress.ip_address('0.0.0.0')
         if 'ipaddr' in kwargs:
             try:
@@ -130,7 +126,6 @@ class Request(object):
         self._response = Response()
         self.params = dict(params)
         self.key = key
-        self.sfn = sfn
         self.admin = False
 
         #set initial state 
@@ -499,7 +494,6 @@ class Request(object):
         #add to response object
         r.addParam('nut', nutstr)
         r.addParam('qry', qry)
-        r.addParam('sfn', depad(urlsafe_b64encode(self.sfn.encode('utf-8')).decode('utf-8')))
 
         #return response object
         return r
@@ -522,7 +516,7 @@ class Request(object):
         """
 
         #required params
-        for req in ['nut', 'sfn', 'client', 'server', 'ids']:
+        for req in ['nut', 'client', 'server', 'ids']:
             if req not in self.params:
                 return False
 
@@ -572,7 +566,6 @@ class Request(object):
 
             ``sigs`` : One or more signatures were invalid.
             ``hmac`` : The HMAC didn't match.
-            ``sfn`` : The SFN doesn't match what you advertise
             ``nut`` : The nut failed fundamental decryption checks.
             ``ip`` : The ip addresses didn't match. Request confirmation.
             ``time`` : The nut is stale. Request confirmation.
@@ -604,30 +597,25 @@ class Request(object):
                     errs.append('hmac')
 
             if validmac:
-                validsfn = True
-                if self.params['sfn'] != depad(urlsafe_b64encode(self.sfn.encode('utf-8')).decode('utf-8')):
-                    validsfn = False
-                    errs.append('sfn')
-                if validsfn:
-                    # Validate nut 
-                    validnut = True
-                    nut = Nut(self.key)
-                    try:
-                        nut = nut.load(self.params['nut']).validate(self.ipaddr, self.ttl, maxcounter=self.maxcounter, mincounter=self.mincounter)
-                    except nacl.exceptions.CryptoError:
-                        validnut = False
-                    if not validnut:
-                        errs.append('nut')
+                # Validate nut 
+                validnut = True
+                nut = Nut(self.key)
+                try:
+                    nut = nut.load(self.params['nut']).validate(self.ipaddr, self.ttl, maxcounter=self.maxcounter, mincounter=self.mincounter)
+                except nacl.exceptions.CryptoError:
+                    validnut = False
+                if not validnut:
+                    errs.append('nut')
 
-                    if validnut:
-                        if not nut.ipmatch:
-                            errs.append('ip')
-                        else:
-                            self._response.tifOn(0x04)
-                        if not nut.fresh:
-                            errs.append('time')
-                        if not nut.countersane:
-                            errs.append('counter')
+                if validnut:
+                    if not nut.ipmatch:
+                        errs.append('ip')
+                    else:
+                        self._response.tifOn(0x04)
+                    if not nut.fresh:
+                        errs.append('time')
+                    if not nut.countersane:
+                        errs.append('counter')
 
         return errs
 

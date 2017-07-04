@@ -44,7 +44,7 @@ def test_sig_validation():
 
 def test_constructor():
     #no kwargs at all
-    req = sqrlserver.Request(nacl.utils.random(32), 'GRC', {})
+    req = sqrlserver.Request(nacl.utils.random(32), {})
     assert str(req.ipaddr) == '0.0.0.0'
     assert req.ttl == 600
     assert req.mincounter == None
@@ -53,37 +53,37 @@ def test_constructor():
 
     #valid ip address
     goodip = '1.2.3.4'
-    req = sqrlserver.Request(nacl.utils.random(32), 'GRC', {}, ipaddr=goodip)
+    req = sqrlserver.Request(nacl.utils.random(32), {}, ipaddr=goodip)
     assert str(req.ipaddr) == goodip
 
     #invalid ip address
     badip = 'abcd'
     with pytest.raises(ValueError):
-        req = sqrlserver.Request(nacl.utils.random(32), 'GRC', {}, ipaddr=badip)
+        req = sqrlserver.Request(nacl.utils.random(32), {}, ipaddr=badip)
 
     #invalid mincounter
     with pytest.raises(ValueError):
-        req = sqrlserver.Request(nacl.utils.random(32), 'GRC', {}, ipaddr=goodip, mincounter='a')
+        req = sqrlserver.Request(nacl.utils.random(32), {}, ipaddr=goodip, mincounter='a')
     with pytest.raises(ValueError):
-        req = sqrlserver.Request(nacl.utils.random(32), 'GRC', {}, ipaddr=goodip, mincounter=-5)
+        req = sqrlserver.Request(nacl.utils.random(32), {}, ipaddr=goodip, mincounter=-5)
     with pytest.raises(ValueError):
-        req = sqrlserver.Request(nacl.utils.random(32), 'GRC', {}, ipaddr=goodip, mincounter=3.2)
+        req = sqrlserver.Request(nacl.utils.random(32), {}, ipaddr=goodip, mincounter=3.2)
 
     #invalid maxcounter
     with pytest.raises(ValueError):
-        req = sqrlserver.Request(nacl.utils.random(32), 'GRC', {}, ipaddr=goodip, maxcounter='a')
+        req = sqrlserver.Request(nacl.utils.random(32), {}, ipaddr=goodip, maxcounter='a')
     with pytest.raises(ValueError):
-        req = sqrlserver.Request(nacl.utils.random(32), 'GRC', {}, ipaddr=goodip, maxcounter=-5)
+        req = sqrlserver.Request(nacl.utils.random(32), {}, ipaddr=goodip, maxcounter=-5)
     with pytest.raises(ValueError):
-        req = sqrlserver.Request(nacl.utils.random(32), 'GRC', {}, ipaddr=goodip, maxcounter=3.2)
+        req = sqrlserver.Request(nacl.utils.random(32), {}, ipaddr=goodip, maxcounter=3.2)
 
     #invalid ttl
     with pytest.raises(ValueError):
-        req = sqrlserver.Request(nacl.utils.random(32), 'GRC', {}, ipaddr=goodip, ttl='a')
+        req = sqrlserver.Request(nacl.utils.random(32), {}, ipaddr=goodip, ttl='a')
     with pytest.raises(ValueError):
-        req = sqrlserver.Request(nacl.utils.random(32), 'GRC', {}, ipaddr=goodip, ttl=-5)
+        req = sqrlserver.Request(nacl.utils.random(32), {}, ipaddr=goodip, ttl=-5)
     with pytest.raises(ValueError):
-        req = sqrlserver.Request(nacl.utils.random(32), 'GRC', {}, ipaddr=goodip, ttl=3.2)
+        req = sqrlserver.Request(nacl.utils.random(32), {}, ipaddr=goodip, ttl=3.2)
 
 def test_wellformed():
     key = nacl.utils.random(32)
@@ -99,82 +99,77 @@ def test_wellformed():
     }
 
     #should register as well formed
-    req = sqrlserver.Request(key, 'GRC', goodparams, ipaddr='1.2.3.4', maxcounter=105)
+    req = sqrlserver.Request(key, goodparams, ipaddr='1.2.3.4', maxcounter=105)
     assert req._check_well_formedness() == True
 
     #missing required params
     #nut
     badparams = dict(goodparams)
     del badparams['nut']
-    req = sqrlserver.Request(key, 'GRC', badparams, ipaddr='1.2.3.4', maxcounter=105)
-    assert req._check_well_formedness() == False
-    #sfn
-    badparams = dict(goodparams)
-    del badparams['sfn']
-    req = sqrlserver.Request(key, 'GRC', badparams, ipaddr='1.2.3.4', maxcounter=105)
+    req = sqrlserver.Request(key, badparams, ipaddr='1.2.3.4', maxcounter=105)
     assert req._check_well_formedness() == False
     #client
     badparams = dict(goodparams)
     del badparams['client']
-    req = sqrlserver.Request(key, 'GRC', badparams, ipaddr='1.2.3.4', maxcounter=105)
+    req = sqrlserver.Request(key, badparams, ipaddr='1.2.3.4', maxcounter=105)
     assert req._check_well_formedness() == False
     #server
     badparams = dict(goodparams)
     del badparams['server']
     assert isinstance(badparams['client'], str)
-    req = sqrlserver.Request(key, 'GRC', badparams, ipaddr='1.2.3.4', maxcounter=105)
+    req = sqrlserver.Request(key, badparams, ipaddr='1.2.3.4', maxcounter=105)
     assert req._check_well_formedness() == False
     #ids
     badparams = dict(goodparams)
     del badparams['ids']
-    req = sqrlserver.Request(key, 'GRC', badparams, ipaddr='1.2.3.4', maxcounter=105)
+    req = sqrlserver.Request(key, badparams, ipaddr='1.2.3.4', maxcounter=105)
     assert req._check_well_formedness() == False
 
     #"missing" optional param (should pass)
     badparams = dict(goodparams)
     del badparams['can']
-    req = sqrlserver.Request(key, 'GRC', badparams, ipaddr='1.2.3.4', maxcounter=105)
+    req = sqrlserver.Request(key, badparams, ipaddr='1.2.3.4', maxcounter=105)
     assert req._check_well_formedness() == True
 
     #missing required client params
     #ver
     badparams = dict(goodparams)
     badparams['client'] = 'Y21kPXF1ZXJ5DQppZGs9VExweXJvd0xoV2Y5LWhkTExQUU9BLTcteHBsSTlMT3hzZkxYc3lUY2NWYw0Kb3B0PWNwc35zdWsNCg'
-    req = sqrlserver.Request(key, 'GRC', badparams, ipaddr='1.2.3.4', maxcounter=105)
+    req = sqrlserver.Request(key, badparams, ipaddr='1.2.3.4', maxcounter=105)
     assert req._check_well_formedness() == False
     #cmd
     badparams = dict(goodparams)
     badparams['client'] = 'dmVyPTENCmlkaz1UTHB5cm93TGhXZjktaGRMTFBRT0EtNy14cGxJOUxPeHNmTFhzeVRjY1ZjDQpvcHQ9Y3BzfnN1aw0K'
-    req = sqrlserver.Request(key, 'GRC', badparams, ipaddr='1.2.3.4', maxcounter=105)
+    req = sqrlserver.Request(key, badparams, ipaddr='1.2.3.4', maxcounter=105)
     assert req._check_well_formedness() == False
     #idk
     badparams = dict(goodparams)
     badparams['client'] = 'dmVyPTENCmNtZD1xdWVyeQ0Kb3B0PWNwc35zdWsNCg'
-    req = sqrlserver.Request(key, 'GRC', badparams, ipaddr='1.2.3.4', maxcounter=105)
+    req = sqrlserver.Request(key, badparams, ipaddr='1.2.3.4', maxcounter=105)
     assert req._check_well_formedness() == False
 
     #unsupported version
     badparams = dict(goodparams)
     badparams['client'] = 'dmVyPTINCmNtZD1xdWVyeQ0KaWRrPVRMcHlyb3dMaFdmOS1oZExMUFFPQS03LXhwbEk5TE94c2ZMWHN5VGNjVmMNCm9wdD1jcHN-c3VrDQo'
-    req = sqrlserver.Request(key, 'GRC', badparams, ipaddr='1.2.3.4', maxcounter=105)
+    req = sqrlserver.Request(key, badparams, ipaddr='1.2.3.4', maxcounter=105)
     assert req._check_well_formedness() == False
 
     #unknown command
     badparams = dict(goodparams)
     badparams['client'] = 'dmVyPTENCmNtZD1raWxsDQppZGs9VExweXJvd0xoV2Y5LWhkTExQUU9BLTcteHBsSTlMT3hzZkxYc3lUY2NWYw0Kb3B0PWNwc35zdWsNCg'
-    req = sqrlserver.Request(key, 'GRC', badparams, ipaddr='1.2.3.4', maxcounter=105)
+    req = sqrlserver.Request(key, badparams, ipaddr='1.2.3.4', maxcounter=105)
     assert req._check_well_formedness() == False
 
     #no opt (should pass)
     badparams = dict(goodparams)
     badparams['client'] = 'dmVyPTENCmNtZD1xdWVyeQ0KaWRrPVRMcHlyb3dMaFdmOS1oZExMUFFPQS03LXhwbEk5TE94c2ZMWHN5VGNjVmMNCg'
-    req = sqrlserver.Request(key, 'GRC', badparams, ipaddr='1.2.3.4', maxcounter=105)
+    req = sqrlserver.Request(key, badparams, ipaddr='1.2.3.4', maxcounter=105)
     assert req._check_well_formedness() == True
 
     #unrecognized opt
     badparams = dict(goodparams)
     badparams['client'] = 'dmVyPTENCmNtZD1xdWVyeQ0KaWRrPVRMcHlyb3dMaFdmOS1oZExMUFFPQS03LXhwbEk5TE94c2ZMWHN5VGNjVmMNCm9wdD1jcHN-c3VrfmRpZQ0K'
-    req = sqrlserver.Request(key, 'GRC', badparams, ipaddr='1.2.3.4', maxcounter=105)
+    req = sqrlserver.Request(key, badparams, ipaddr='1.2.3.4', maxcounter=105)
     assert req._check_well_formedness() == False
 
 def test_validity():
@@ -193,17 +188,17 @@ def test_validity():
     badmac = goodmac + 'a'
 
     #Basic case should pass
-    req = sqrlserver.Request(key, 'GRC', goodparams, ipaddr='1.2.3.4', maxcounter=105)
+    req = sqrlserver.Request(key, goodparams, ipaddr='1.2.3.4', maxcounter=105)
     assert req._check_well_formedness() == True
     assert len(req._check_validity()) == 0
 
     #Pass with valid hmac
-    req = sqrlserver.Request(key, 'GRC', goodparams, ipaddr='1.2.3.4', maxcounter=105, hmac=goodmac)
+    req = sqrlserver.Request(key, goodparams, ipaddr='1.2.3.4', maxcounter=105, hmac=goodmac)
     assert req._check_well_formedness() == True
     assert len(req._check_validity()) == 0
 
     #Fail with bad hmac
-    req = sqrlserver.Request(key, 'GRC', goodparams, ipaddr='1.2.3.4', maxcounter=105, hmac=badmac)
+    req = sqrlserver.Request(key, goodparams, ipaddr='1.2.3.4', maxcounter=105, hmac=badmac)
     assert req._check_well_formedness() == True
     errs = req._check_validity()
     assert errs == ['hmac']
@@ -211,18 +206,10 @@ def test_validity():
     #bad signature
     badparams = dict(goodparams)
     badparams['ids'] += 'a'
-    req = sqrlserver.Request(key, 'GRC', badparams, ipaddr='1.2.3.4', maxcounter=105)
+    req = sqrlserver.Request(key, badparams, ipaddr='1.2.3.4', maxcounter=105)
     assert req._check_well_formedness() == True
     errs = req._check_validity()
     assert errs == ['sigs']
-
-    #bad sfn
-    badparams = dict(goodparams)
-    badparams['sfn'] += 'a'
-    req = sqrlserver.Request(key, 'GRC', badparams, ipaddr='1.2.3.4', maxcounter=105)
-    assert req._check_well_formedness() == True
-    errs = req._check_validity()
-    assert errs == ['sfn']
 
     # GAP IN COVERAGE!
     # TODO: NEED TO ADD TESTS FOR pidk AND pids!
@@ -232,7 +219,7 @@ def test_validity():
     badnut = sqrlserver.Nut(nacl.utils.random(32))
     badnutstr = badnut.generate('1.2.3.4', 100).toString('qr')
     badparams['nut'] = badnutstr
-    req = sqrlserver.Request(key, 'GRC', badparams, ipaddr='1.2.3.4', maxcounter=105)
+    req = sqrlserver.Request(key, badparams, ipaddr='1.2.3.4', maxcounter=105)
     assert req._check_well_formedness() == True
     errs = req._check_validity()
     assert errs == ['nut']
@@ -240,27 +227,27 @@ def test_validity():
     #nut issues
     badparams = dict(goodparams)
     #ipmismatch
-    req = sqrlserver.Request(key, 'GRC', badparams, ipaddr='1.2.3.5')
+    req = sqrlserver.Request(key, badparams, ipaddr='1.2.3.5')
     assert req._check_well_formedness() == True
     errs = req._check_validity()
     assert errs == ['ip']
     #not fresh
-    req = sqrlserver.Request(key, 'GRC', badparams, ipaddr='1.2.3.4', ttl=10)
+    req = sqrlserver.Request(key, badparams, ipaddr='1.2.3.4', ttl=10)
     assert req._check_well_formedness() == True
     errs = req._check_validity()
     assert errs == ['time']
     #counter too small
-    req = sqrlserver.Request(key, 'GRC', badparams, ipaddr='1.2.3.4', mincounter=1000)
+    req = sqrlserver.Request(key, badparams, ipaddr='1.2.3.4', mincounter=1000)
     assert req._check_well_formedness() == True
     errs = req._check_validity()
     assert errs == ['counter']
     #counter too big
-    req = sqrlserver.Request(key, 'GRC', badparams, ipaddr='1.2.3.4', maxcounter=1)
+    req = sqrlserver.Request(key, badparams, ipaddr='1.2.3.4', maxcounter=1)
     assert req._check_well_formedness() == True
     errs = req._check_validity()
     assert errs == ['counter']
     #how about all three?
-    req = sqrlserver.Request(key, 'GRC', badparams, ipaddr='1.2.3.5', ttl=10, maxcounter=1)
+    req = sqrlserver.Request(key, badparams, ipaddr='1.2.3.5', ttl=10, maxcounter=1)
     assert req._check_well_formedness() == True
     errs = req._check_validity()
     assert errs == ['ip', 'time', 'counter']
@@ -280,7 +267,7 @@ def test_action_META():
 
     #Make sure an invalid action blows things up
     #First create a valid request
-    req = sqrlserver.Request(key, 'GRC', params, ipaddr='1.2.3.4')
+    req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
     req.handle()
     assert req.state == 'ACTION'
     assert req.action == [('find', ['TLpyrowLhWf9-hdLLPQOA-7-xplI9LOxsfLXsyTccVc'])]
@@ -305,7 +292,7 @@ def test_action_confirm():
     }
 
     #Create request with ip mismatch and run the handler
-    req = sqrlserver.Request(key, 'GRC', params, ipaddr='2.3.4.5')
+    req = sqrlserver.Request(key, params, ipaddr='2.3.4.5')
     req.handle()
     assert req.state == 'ACTION'
     assert req.action == [('confirm', ['ip'])]
@@ -318,7 +305,7 @@ def test_action_confirm():
     assert req._response._tif & 0x40
 
     #Confirm with nothing (should also fail)
-    req = sqrlserver.Request(key, 'GRC', params, ipaddr='2.3.4.5')
+    req = sqrlserver.Request(key, params, ipaddr='2.3.4.5')
     req.handle()
     req.handle()
     assert req.state == 'COMPLETE'
@@ -326,7 +313,7 @@ def test_action_confirm():
     assert req._response._tif & 0x40
 
     #Create request with ttl mismatch and run the handler
-    req = sqrlserver.Request(key, 'GRC', params, ipaddr='1.2.3.4', ttl=0)
+    req = sqrlserver.Request(key, params, ipaddr='1.2.3.4', ttl=0)
     req.handle()
     assert req.state == 'ACTION'
     assert req.action == [('confirm', ['time'])]
@@ -353,7 +340,7 @@ def test_cmd_query():
     #TODO: Need coverage for previous identities
 
     #Create a valid request
-    req = sqrlserver.Request(key, 'GRC', params, ipaddr='1.2.3.4')
+    req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
     req.handle()
     assert req.state == 'ACTION'
     assert req.action == [('find', ['TLpyrowLhWf9-hdLLPQOA-7-xplI9LOxsfLXsyTccVc'])]
@@ -364,7 +351,7 @@ def test_cmd_query():
     assert req._response._tif == 0x01 + 0x04
 
     #confirm with found but disabled
-    req = sqrlserver.Request(key, 'GRC', params, ipaddr='1.2.3.4')
+    req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
     req.handle()
     req.handle({'found': [True], 'disabled': None, 'suk': 'SUK'})
     assert req.state == 'COMPLETE'
@@ -372,14 +359,14 @@ def test_cmd_query():
     assert req._response.params['suk'] == 'SUK'
 
     #confirm with not found
-    req = sqrlserver.Request(key, 'GRC', params, ipaddr='1.2.3.4')
+    req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
     req.handle()
     req.handle({'found': [False]})
     assert req.state == 'COMPLETE'
     assert req._response._tif == 0x04
 
     #confirm with garbage
-    req = sqrlserver.Request(key, 'GRC', params, ipaddr='1.2.3.4')
+    req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
     req.handle()
     with pytest.raises(ValueError):
         req.handle({'found': None})
@@ -406,7 +393,7 @@ def test_cmd_ident():
     #TODO: Need coverage for previous identities
 
     #new user
-    req = sqrlserver.Request(key, 'GRC', newuserparams, ipaddr='1.2.3.4')
+    req = sqrlserver.Request(key, newuserparams, ipaddr='1.2.3.4')
     req.handle()
     assert req.state == 'ACTION'
     assert req.action == [
@@ -423,7 +410,7 @@ def test_cmd_ident():
     ]
 
     #known user
-    req = sqrlserver.Request(key, 'GRC', params, ipaddr='1.2.3.4')
+    req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
     req.handle()
     assert req.state == 'ACTION'
     assert req.action == [
@@ -441,7 +428,7 @@ def test_cmd_ident():
     assert req._response.params['suk'] == 'SUK'
 
     #successful auth with cps
-    req = sqrlserver.Request(key, 'GRC', params, ipaddr='1.2.3.4')
+    req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
     req.handle()
     req.handle({'authenticated': True, 'suk': 'SUK', 'url': '/cpsurl'})
     assert req.state == 'COMPLETE'
@@ -452,7 +439,7 @@ def test_cmd_ident():
 
 
     #failed auth
-    req = sqrlserver.Request(key, 'GRC', params, ipaddr='1.2.3.4')
+    req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
     req.handle()
     req.handle({'authenticated': False})
     assert req.state == 'COMPLETE'
@@ -460,7 +447,7 @@ def test_cmd_ident():
     assert req._response._tif & 0x80
 
     #failed auth due to disabled
-    req = sqrlserver.Request(key, 'GRC', params, ipaddr='1.2.3.4')
+    req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
     req.handle()
     req.handle({'authenticated': False, 'disabled': True, 'suk': 'SUK'})
     assert req.state == 'COMPLETE'
@@ -471,13 +458,13 @@ def test_cmd_ident():
 
     #disabled but no SUK given
     with pytest.raises(ValueError):
-        req = sqrlserver.Request(key, 'GRC', params, ipaddr='1.2.3.4')
+        req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
         req.handle()
         req.handle({'authenticated': False, 'disabled': True})
 
     #ignored auth
     with pytest.raises(ValueError):
-        req = sqrlserver.Request(key, 'GRC', params, ipaddr='1.2.3.4')
+        req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
         req.handle()
         req.handle()
 
@@ -494,7 +481,7 @@ def test_cmd_disable():
     }
 
     #Initial request
-    req = sqrlserver.Request(key, 'GRC', params, ipaddr='1.2.3.4')
+    req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
     req.handle()
     assert req.state == 'ACTION'
     assert req.action == [
@@ -512,7 +499,7 @@ def test_cmd_disable():
     assert not req._response._tif & 0x40    #command was indeed completed
 
     #Failed deactivation and user not known
-    req = sqrlserver.Request(key, 'GRC', params, ipaddr='1.2.3.4')
+    req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
     req.handle()
     req.handle({'deactivated': False})
     assert req.state == 'COMPLETE'
@@ -521,7 +508,7 @@ def test_cmd_disable():
     assert req._response._tif & 0x40    
 
     #Failed deactivation but user known
-    req = sqrlserver.Request(key, 'GRC', params, ipaddr='1.2.3.4')
+    req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
     req.handle()
     req.handle({'deactivated': False, 'found': True, 'suk': 'SUK'})
     assert req.state == 'COMPLETE'
@@ -531,13 +518,13 @@ def test_cmd_disable():
 
     #Command ignored
     with pytest.raises(ValueError):
-        req = sqrlserver.Request(key, 'GRC', params, ipaddr='1.2.3.4')
+        req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
         req.handle()
         req.handle({'suk': 'SUK'})
 
     #suk ignored
     with pytest.raises(ValueError):
-        req = sqrlserver.Request(key, 'GRC', params, ipaddr='1.2.3.4')
+        req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
         req.handle()
         req.handle({'deactivated': True})
 
@@ -555,7 +542,7 @@ def test_cmd_enable():
     }
 
     #Initial request asks for VUK
-    req = sqrlserver.Request(key, 'GRC', params, ipaddr='1.2.3.4')
+    req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
     req.handle()
     assert req.state == 'ACTION'
     assert req.action == [('vuk',)]
@@ -577,7 +564,7 @@ def test_cmd_enable():
     assert not req._response._tif & 0x40
 
     #Enabled False, found False
-    req = sqrlserver.Request(key, 'GRC', params, ipaddr='1.2.3.4')
+    req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
     req.handle()
     req.handle({'vuk': '3gyFVqlNogtpKscrDy7sopPk3xasMisEnAJdSniioE4'})
     req.handle({'activated': False})
@@ -586,7 +573,7 @@ def test_cmd_enable():
     assert req._response._tif & 0x40
 
     #Enabled False, found True
-    req = sqrlserver.Request(key, 'GRC', params, ipaddr='1.2.3.4')
+    req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
     req.handle()
     req.handle({'vuk': '3gyFVqlNogtpKscrDy7sopPk3xasMisEnAJdSniioE4'})
     req.handle({'activated': False, 'found': True})
@@ -596,13 +583,13 @@ def test_cmd_enable():
 
     #Enabled omitted
     with pytest.raises(ValueError):
-        req = sqrlserver.Request(key, 'GRC', params, ipaddr='1.2.3.4')
+        req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
         req.handle()
         req.handle({'vuk': '3gyFVqlNogtpKscrDy7sopPk3xasMisEnAJdSniioE4'})
         req.handle({'found': True})
 
     #Signature fail
-    req = sqrlserver.Request(key, 'GRC', params, ipaddr='1.2.3.4')
+    req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
     req.handle()
     req.handle({'vuk': '3gyFVqlNogtpKscrDy7sopPk3xasMisEnAJdSniioe4'})
     assert req.state == 'COMPLETE'
@@ -623,7 +610,7 @@ def test_cmd_remove():
     }
 
     #Initial request asks for VUK
-    req = sqrlserver.Request(key, 'GRC', params, ipaddr='1.2.3.4')
+    req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
     req.handle()
     assert req.state == 'ACTION'
     assert req.action == [('vuk',)]
@@ -642,7 +629,7 @@ def test_cmd_remove():
     assert not req._response._tif & 0x40
 
     #Removed False, found False
-    req = sqrlserver.Request(key, 'GRC', params, ipaddr='1.2.3.4')
+    req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
     req.handle()
     req.handle({'vuk': '3gyFVqlNogtpKscrDy7sopPk3xasMisEnAJdSniioE4'})
     req.handle({'removed': False})
@@ -651,7 +638,7 @@ def test_cmd_remove():
     assert req._response._tif & 0x40
 
     #Removed False, found True
-    req = sqrlserver.Request(key, 'GRC', params, ipaddr='1.2.3.4')
+    req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
     req.handle()
     req.handle({'vuk': '3gyFVqlNogtpKscrDy7sopPk3xasMisEnAJdSniioE4'})
     req.handle({'removed': False, 'found': True})
@@ -661,13 +648,13 @@ def test_cmd_remove():
 
     #Removed omitted
     with pytest.raises(ValueError):
-        req = sqrlserver.Request(key, 'GRC', params, ipaddr='1.2.3.4')
+        req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
         req.handle()
         req.handle({'vuk': '3gyFVqlNogtpKscrDy7sopPk3xasMisEnAJdSniioE4'})
         req.handle({'found': True})
 
     #Signature fail
-    req = sqrlserver.Request(key, 'GRC', params, ipaddr='1.2.3.4')
+    req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
     req.handle()
     req.handle({'vuk': '3gyFVqlNogtpKscrDy7sopPk3xasMisEnAJdSniioe4'})
     assert req.state == 'COMPLETE'
@@ -690,7 +677,7 @@ def test_action_canasksin():
     #TODO: Need coverage for previous identities
 
     #Injection of can and sin
-    req = sqrlserver.Request(key, 'GRC', params, ipaddr='1.2.3.4')
+    req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
     req.handle({'sin': 'index', 'can': 'https://example.com:8080/sqrl?a=b&c=d'})
     assert req.state == 'ACTION'
     assert req._response.params['sin'] == 'index'
@@ -705,26 +692,26 @@ def test_action_canasksin():
     ask4 = {'msg': 'Two buttons', 'buttons': (('Button 1',), ('Button 2',))}
     ask5 = {'msg': 'Two buttons w/ URLs', 'buttons': (('Button 1', '/url1'), ('Button 2', 'https://www.example.com:8080/url2#frag'))}
 
-    req = sqrlserver.Request(key, 'GRC', params, ipaddr='1.2.3.4')
+    req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
     req.handle({'ask': ask1})
     assert req._response.params['ask'] == 'U2ltcGxlIHF1ZXN0aW9u'
     assert not req._response._tif & 0x40
 
-    req = sqrlserver.Request(key, 'GRC', params, ipaddr='1.2.3.4')
+    req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
     req.handle({'ask': ask2})
     assert req._response.params['ask'] == 'T25lIGJ1dHRvbg~QnV0dG9uIDE'
     assert not req._response._tif & 0x40
 
     with pytest.raises(ValueError):
-        req = sqrlserver.Request(key, 'GRC', params, ipaddr='1.2.3.4')
+        req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
         req.handle({'ask': ask3})
 
-    req = sqrlserver.Request(key, 'GRC', params, ipaddr='1.2.3.4')
+    req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
     req.handle({'ask': ask4})
     assert req._response.params['ask'] == 'VHdvIGJ1dHRvbnM~QnV0dG9uIDE~QnV0dG9uIDI'
     assert not req._response._tif & 0x40
 
-    req = sqrlserver.Request(key, 'GRC', params, ipaddr='1.2.3.4')
+    req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
     req.handle({'ask': ask5})
     assert req._response.params['ask'] == 'VHdvIGJ1dHRvbnMgdy8gVVJMcw~QnV0dG9uIDE;/url1~QnV0dG9uIDI;/url2#frag'
     assert not req._response._tif & 0x40
@@ -743,7 +730,7 @@ def test_finalize():
     }
     nextnut = nut.generate('1.2.3.4', 110)
 
-    req = sqrlserver.Request(key, 'GRC', params, ipaddr='1.2.3.4')
+    req = sqrlserver.Request(key, params, ipaddr='1.2.3.4')
     req.handle() #FIND action issued
     req.handle({'found': [True]})
     r = req.finalize(nut=nextnut)
@@ -751,7 +738,6 @@ def test_finalize():
     server = sqrlserver.Request._extract_server(server)
     assert server['nut'] == nextnut.toString('qr')
     assert server['tif'] == '5'
-    assert 'sfn=R1JD' in server['qry']
     assert 'nut='+nextnut.toString('qr') in server['qry']
 
 

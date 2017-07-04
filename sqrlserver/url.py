@@ -12,8 +12,6 @@ class Url(object):
             client will contact to authenticate. Includes the username,
             password, domain, and port. See RFC 3986, Jan 2005, section
             3.2 (https://tools.ietf.org/html/rfc3986#section-3.2)
-        sfn (string) : The "server friendly name" the SQRL client will
-            use to identify you to the user.
         secure (bool) : If True, uses the ``sqrl`` scheme, otherwise
             it uses ``qrl``. Defaults to True.
 
@@ -21,9 +19,8 @@ class Url(object):
         Url : The initial Url object
     """
 
-    def __init__(self, authority, sfn, secure=True):
+    def __init__(self, authority, secure=True):
         self.authority = authority
-        self.sfn = sfn
         self.secure = secure
 
     def generate(self, path, **kwargs):
@@ -92,7 +89,6 @@ class Url(object):
             query = kwargs['query']
         if ( ('ext' in kwargs) and (kwargs['ext'] is not None) and (kwargs['ext'] > 0) ):
             query.insert(0, ('x', kwargs['ext']))
-        query.insert(0, ('sfn', depad(urlsafe_b64encode(self.sfn.encode('utf-8')).decode('utf-8'))))
         query.insert(0, ('nut', nutstr))
 
         #build
